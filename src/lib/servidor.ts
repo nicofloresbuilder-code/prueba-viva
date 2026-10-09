@@ -23,7 +23,11 @@ export async function gemini(sistema: string, usuario: string): Promise<unknown 
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: sistema }] },
         contents: [{ role: "user", parts: [{ text: usuario }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 2048 },
+        generationConfig: {
+          responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 4096,
+          // Sin "pensamiento": la tarea es corta y así no se come los tokens de la respuesta.
+          ...(MODELO.includes("2.5-flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        },
       }),
       signal: ctrl.signal,
     });

@@ -46,6 +46,7 @@ const crit = ENCARGO_DEMO.criterios;
 const sim = preguntasSimuladas({ encargo: ENCARGO_DEMO.titulo, criterios: crit, bitacora: BITACORA_DEMO });
 prueba("simulado da 5 preguntas", sim.length === 5);
 prueba("simulado pasa la validación", validarPreguntas({ preguntas: sim }, crit)?.length === 5);
+prueba("la pregunta 1 no repite el verbo decidir", !/decidiste "?decid/i.test(sim[0].texto));
 prueba("simulado pregunta por la IA si se usó", sim.some((p) => /IA/.test(p.texto)));
 prueba("menos de 5 preguntas se rechaza", validarPreguntas({ preguntas: sim.slice(0, 3) }, crit) === null);
 prueba("pregunta sin signo de interrogación se rechaza", validarPreguntas({ preguntas: sim.map((p, i) => (i === 0 ? { ...p, texto: "Explica tu decisión de ordenar los pedidos." } : p)) }, crit) === null);

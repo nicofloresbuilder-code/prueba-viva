@@ -68,12 +68,19 @@ function recorta(s: string, n = 70): string {
   return t.length > n ? `${t.slice(0, n).replace(/\s\S*$/, "")}…` : t;
 }
 
+/* Bug del primer pase mecánico: la bitácora suele empezar con "Decidí…" y la
+   pregunta salía "dices que decidiste \"Decidí empezar…\"". Se quita el verbo. */
+export function sinVerbo(s: string): string {
+  const t = s.trim().replace(/^(decid[ií]|eleg[ií]|opt[eé])\s+(que\s+)?/i, "");
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
+
 export function preguntasSimuladas(e: EntradaPreguntas): Pregunta[] {
   const b = e.bitacora;
   const conIA = b.find((x) => x.usoIA);
   const c = (i: number) => e.criterios[i % e.criterios.length];
   const base = [
-    `En tu bitácora dices que decidiste "${recorta(b[0]?.decision ?? "")}". ¿Por qué esa y no otra opción?`,
+    `En tu bitácora dices que decidiste ${recorta(sinVerbo(b[0]?.decision ?? ""))} ¿Por qué esa y no otra opción?`,
     `Cuéntame paso a paso cómo hiciste esto: "${recorta(b[1]?.que ?? b[0]?.que ?? "")}". ¿Qué fue lo más difícil?`,
     conIA
       ? `Usaste IA para "${recorta(conIA.paraQueIA)}". ¿Qué revisaste o corregiste de lo que te dio, y cómo supiste que estaba bien?`
