@@ -36,9 +36,11 @@ Antes de que cierre el módulo, esto funciona en la URL en vivo:
 
 ![Mockup de la defensa en vivo](img/mockup_prueba_viva.png)
 
-*Mockup generado de la pantalla de defensa: las preguntas de la IA a la izquierda, las notas del tutor a la derecha, y la advertencia permanente de que la IA no califica.*
+*Mockup de la pantalla de defensa: las preguntas de la IA a la izquierda, la respuesta del tutor (un toque y nota opcional) a la derecha, y la advertencia permanente de que la IA no califica.*
 
 ## 5. El flujo
+
+Los diagramas también están en imagen: [flujo](img/diagrama1.png) · [quién hace qué](img/diagrama2.png).
 
 ### Flujo del producto
 
@@ -129,3 +131,13 @@ Si esta rebanada funciona, PRUEBA VIVA se vuelve la capa de evidencia de los pro
 | 10 | Editar una letra del enlace de la constancia | La verificación dice que no es auténtica. |
 | 11 | Abrir el enlace en otro dispositivo | Se ve la constancia con lo que prueba y lo que no. |
 | 12 | Vista en celular (390 px) | Todo se usa sin scroll horizontal. |
+
+## 11. Resultado de las pruebas
+
+**Autoprueba del motor:** `npx tsx src/lib/__selftest.ts` → 57 aserciones correctas, 0 fallas.
+
+**Pase mecánico (Playwright contra el build de producción):** las pruebas 1 a 5 y 7 a 12 pasan. La 6 (con llave real de Gemini) se corre en el despliegue.
+
+**Bug encontrado y corregido:** la pregunta simulada repetía el verbo ("dices que decidiste \"Decidí empezar…\""). Se quitó el verbo inicial, se agregó una aserción y se volvió a desplegar. También se desactivó el "pensamiento" de Gemini 2.5 Flash para que no se coma los tokens y trunque el JSON.
+
+**Persona test:** ver `docs/PERSONA.md` (tres personas, 15 confusiones, 9 cambios).
