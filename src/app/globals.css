@@ -168,3 +168,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-
   .panel { border: 0; padding: 0; }
   body { background: #fff; }
 }
+
+/* Cambios del persona test */
+:root { --ambar: #8a5a00; --ambar-claro: #fdf3dc; }
+.ia-uso { border-color: var(--ambar); color: var(--ambar); background: var(--ambar-claro); }
+.resumen-firma { border-left: 4px solid var(--tinta); padding: 4px 0 4px 12px; margin: 16px 0 6px; }
+.resumen-firma p { margin: 0 0 2px; }
+.cita { font-style: italic; }
+details.no-prueba summary { cursor: pointer; }
+details.no-prueba ul { margin-top: 8px; }
+.marcas { display: flex; flex-wrap: wrap; border: 1.5px solid var(--tinta); width: fit-content; margin-bottom: 8px; }
+.marcas button { appearance: none; border: 0; background: var(--papel); padding: 9px 12px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.marcas button + button { border-left: 1.5px solid var(--tinta); }
+.marcas button[aria-pressed="true"].bien { background: var(--ok); color: #fff; }
+.marcas button[aria-pressed="true"].dudo { background: var(--ambar); color: #fff; }
+.marcas button[aria-pressed="true"].no-supo { background: var(--tinta); color: var(--papel); }
+.falta { font-size: 14px; color: var(--sello); font-weight: 600; margin: 8px 0 0; width: 100%; }
+.estandares { display: grid; gap: 8px; }
+.estandar-op { border: 1.5px solid var(--tinta); padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; cursor: pointer; background: var(--papel); }
+.estandar-op.activa { background: var(--tinta); color: var(--papel); }
+.estandar-op input { margin-top: 4px; accent-color: var(--sello); }
+.estandar-op small { display: block; font-family: var(--mono); font-size: 11.5px; opacity: .75; }
+@media (max-width: 760px) { .marcas { width: 100%; } .marcas button { flex: 1; padding: 10px 6px; } }

@@ -3,7 +3,7 @@
 import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO } from "./demo";
 import { alertasSimuladas, preguntasSimuladas } from "./ia";
 import {
-  codigoConstancia, construirConstancia, defensaCompleta, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
+  codigoConstancia, construirConstancia, defensaCompleta, notaParaIA, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
   respuestaTraeCalificacion, revisarTexto, validarAlertas, validarEncargo, validarEntrada, validarFirma, validarPreguntas,
 } from "./motor";
 import { canonico, deB64url, fragmento, sellar, sellosIguales } from "./sello";
@@ -65,14 +65,18 @@ prueba("alerta que dice apto se descarta", validarAlertas({ alertas: [{ tipo: "h
 /* Defensa y firma */
 const defensa: Defensa = {
   preguntas: sim, fuente: "simulado", generadas: new Date().toISOString(),
-  notas: Object.fromEntries(sim.map((p, i) => [p.id, NOTAS_DEMO[i]])), alertas: null, fuenteAlertas: null,
+  notas: Object.fromEntries(sim.map((p, i) => [p.id, NOTAS_DEMO[i]])),
+  marcas: Object.fromEntries(sim.map((p) => [p.id, "bien" as const])), alertas: null, fuenteAlertas: null,
 };
-prueba("defensa con 5 notas está completa", defensaCompleta(defensa));
-prueba("defensa con 3 notas no está completa", !defensaCompleta({ ...defensa, notas: { p1: NOTAS_DEMO[0], p2: NOTAS_DEMO[1], p3: NOTAS_DEMO[2] } }));
+prueba("defensa con 5 respuestas marcadas está completa", defensaCompleta(defensa));
+prueba("defensa con 3 respuestas marcadas no está completa", !defensaCompleta({ ...defensa, marcas: { p1: "bien", p2: "dudo", p3: "bien" } }));
+prueba("con 4 marcas y sin notas escritas sí está completa", defensaCompleta({ ...defensa, notas: {}, marcas: { p1: "bien", p2: "dudo", p3: "no-supo", p4: "bien" } }));
+prueba("una nota demasiado larga invalida la defensa", !defensaCompleta({ ...defensa, notas: { p1: "x".repeat(501) } }));
+prueba("la IA recibe la marca y la nota juntas", notaParaIA(defensa, "p1").startsWith("Lo explicó bien.") && notaParaIA(defensa, "p1").includes("9 sin respuesta"));
 const alertas = alertasSimuladas({ encargo: ENCARGO_DEMO.titulo, criterios: crit, bitacora: BITACORA_DEMO, preguntas: sim, notas: defensa.notas });
 prueba("con buenas notas no hay alerta de IA sin explicar", !alertas.some((a) => a.tipo === "ia-sin-explicar"));
-const alertasVacias = alertasSimuladas({ encargo: ENCARGO_DEMO.titulo, criterios: crit, bitacora: BITACORA_DEMO, preguntas: sim, notas: { p1: "bien" } });
-prueba("notas cortas y IA sin explicar generan alertas", alertasVacias.some((a) => a.tipo === "ia-sin-explicar") && alertasVacias.some((a) => a.tipo === "hueco"));
+const alertasVacias = alertasSimuladas({ encargo: ENCARGO_DEMO.titulo, criterios: crit, bitacora: BITACORA_DEMO, preguntas: sim, notas: { p1: "Dudó." } });
+prueba("dudas, vacíos e IA sin explicar generan alertas", alertasVacias.some((a) => a.tipo === "ia-sin-explicar") && alertasVacias.some((a) => a.tipo === "hueco"));
 
 const firma: Firma = {
   nombreCompleto: "Rogelio Martínez", cargo: "Encargado de mostrador",

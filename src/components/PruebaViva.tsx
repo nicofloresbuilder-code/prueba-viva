@@ -5,10 +5,10 @@ import Constancia from "./Constancia";
 import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO } from "@/lib/demo";
 import { criterio, ESTANDARES, estandar } from "@/lib/estandares";
 import {
-  defensaCompleta, EXPLICACION_RECHAZO, fmtFecha, fmtHora, LIM, listoParaDefensa, MOTIVO_PRACTICA, PESO,
-  revisarTexto, validarEncargo, validarEntrada, validarFirma,
+  defensaCompleta, EXPLICACION_RECHAZO, fmtFecha, fmtHora, LIM, listoParaDefensa, MARCAS, MOTIVO_PRACTICA, notaParaIA, PESO,
+  respondidas, revisarTexto, validarEncargo, validarEntrada, validarFirma,
 } from "@/lib/motor";
-import type { Constancia as TConstancia, Defensa, Encargo, EntradaBitacora, Firma, FuenteIA, TipoCentro } from "@/lib/types";
+import type { Constancia as TConstancia, Defensa, Encargo, EntradaBitacora, Firma, FuenteIA, Marca, TipoCentro } from "@/lib/types";
 
 /* ───────────── Estado ───────────── */
 
@@ -127,11 +127,10 @@ export default function PruebaViva() {
           <div className="estado">
             {servidor && (
               <span className={`chip ${servidor.ia === "gemini" ? "ok" : "sim"}`}>
-                IA: {servidor.ia === "gemini" ? "Gemini conectado" : "SIMULADO (sin llave)"}
+                {servidor.ia === "gemini" ? "Preguntas con IA (Gemini)" : "Preguntas en modo sin IA (simulado)"}
               </span>
             )}
-            {servidor && <span className={`chip ${servidor.sello ? "ok" : "sim"}`}>Sello: {servidor.sello ? "activo" : "sin configurar"}</span>}
-            <span className="chip">Sin cuentas · nada personal en el servidor</span>
+            {servidor && !servidor.sello && <span className="chip sim">Constancias aún no disponibles</span>}
           </div>
         </div>
         <p className="lema">
@@ -275,11 +274,19 @@ function PasoEncargo({ s, setS, irA, cargarDemo }: Props & { cargarDemo: () => v
           </div>
 
           <div className="campo ancho">
-            <label htmlFor="estandar">Estándar de competencia (CONOCER)</label>
-            <select id="estandar" value={e.estandar} onChange={(ev) => setS((x) => ({ ...x, encargo: { ...x.encargo, estandar: ev.target.value, criterios: [] }, encargoGuardado: false }))}>
-              {ESTANDARES.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo} · {x.titulo}</option>)}
-            </select>
-            <p className="ayuda">Elige de 2 a 6 criterios que este encargo permite ver ({e.criterios.length} elegidos).</p>
+            <span className="etiqueta">¿A qué se parece más este trabajo?</span>
+            <div className="estandares" role="radiogroup">
+              {ESTANDARES.map((x) => (
+                <label key={x.codigo} className={`estandar-op${e.estandar === x.codigo ? " activa" : ""}`}>
+                  <input type="radio" name="estandar" checked={e.estandar === x.codigo}
+                    onChange={() => setS((y) => ({ ...y, encargo: { ...y.encargo, estandar: x.codigo, criterios: [] }, encargoGuardado: false }))} />
+                  <span>{x.titulo}<small>Criterios oficiales de CONOCER · {x.codigo}</small></span>
+                </label>
+              ))}
+            </div>
+            <p className="ayuda" style={{ marginTop: 8 }}>
+              Palomea lo que vas a poder ver con tus propios ojos mientras el joven trabaja: de 2 a 6 ({e.criterios.length} elegidos).
+            </p>
           </div>
         </div>
 
@@ -348,7 +355,7 @@ function PasoBitacora({ s, setS, irA }: Props) {
         Anota mientras trabajas: qué hiciste y, sobre todo, qué decidiste y por qué. Si usaste IA, dilo y di para qué.
         Usarla no te descalifica; esconderla sí.
       </p>
-      <p className="progreso">{n} de {LIM.entradasMin} entradas mínimas{n >= LIM.entradasMin ? " · lista para la defensa" : ""}</p>
+      <p className="progreso">{n >= LIM.entradasMin ? `${n} entradas (mínimo ${LIM.entradasMin}) ✓ lista para la defensa` : `${n} de ${LIM.entradasMin} entradas mínimas`}</p>
 
       {n > 0 && (
         <ol className="linea-tiempo">
@@ -411,7 +418,7 @@ function PasoDefensa({ s, setS, irA }: Props) {
       const r = await fetch("/api/preguntas", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudieron generar las preguntas.");
-      setS((x) => ({ ...x, defensa: { preguntas: j.preguntas, fuente: j.fuente, generadas: new Date().toISOString(), notas: {}, alertas: null, fuenteAlertas: null } }));
+      setS((x) => ({ ...x, defensa: { preguntas: j.preguntas, fuente: j.fuente, generadas: new Date().toISOString(), notas: {}, marcas: {}, alertas: null, fuenteAlertas: null } }));
     } catch (e) { setError((e as Error).message); } finally { setCargando(null); }
   };
 
@@ -421,7 +428,7 @@ function PasoDefensa({ s, setS, irA }: Props) {
     try {
       const r = await fetch("/api/alertas", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...cuerpo, preguntas: d.preguntas.map(({ id, texto, criterioId }) => ({ id, texto, criterioId })), notas: d.notas }),
+        body: JSON.stringify({ ...cuerpo, preguntas: d.preguntas.map(({ id, texto, criterioId }) => ({ id, texto, criterioId })), notas: Object.fromEntries(d.preguntas.map((p) => [p.id, notaParaIA(d, p.id)])) }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudieron revisar las notas.");
@@ -432,7 +439,13 @@ function PasoDefensa({ s, setS, irA }: Props) {
   const nota = (id: string, v: string) =>
     setS((x) => (x.defensa ? { ...x, defensa: { ...x.defensa, notas: { ...x.defensa.notas, [id]: v.slice(0, LIM.notaDefensa[1]) }, alertas: null } } : x));
 
-  const anotadas = d ? d.preguntas.filter((p) => (d.notas[p.id] ?? "").trim().length >= LIM.notaDefensa[0]).length : 0;
+  const marcar = (id: string, m: Marca) =>
+    setS((x) => (x.defensa ? { ...x, defensa: { ...x.defensa, marcas: { ...(x.defensa.marcas ?? {}), [id]: m }, alertas: null } } : x));
+  const anotadas = respondidas(d);
+  const irAFirma = () => {
+    setS((x) => ({ ...x, firma: { ...x.firma, nombreCompleto: x.firma.nombreCompleto || x.encargo.tutorNombre, cargo: x.firma.cargo || x.encargo.tutorCargo } }));
+    irA(4);
+  };
 
   return (
     <>
@@ -459,7 +472,7 @@ function PasoDefensa({ s, setS, irA }: Props) {
             <span className={`chip ${d.fuente === "gemini" ? "ok" : "sim"}`}>
               Preguntas: {d.fuente === "gemini" ? "propuestas por Gemini" : "SIMULADAS (plantilla, no es IA)"}
             </span>
-            <span className="chip">{anotadas} de 5 anotadas · mínimo 4</span>
+            <span className="chip">{anotadas} de 5 respondidas · mínimo 4</span>
           </div>
 
           {d.preguntas.map((p, i) => (
@@ -470,14 +483,22 @@ function PasoDefensa({ s, setS, irA }: Props) {
                 {p.porQue && <p className="por">Qué busca: {p.porQue}</p>}
                 <p className="por">Criterio: {criterio(p.criterioId)?.texto}</p>
               </div>
-              <Campo id={`nota-${p.id}`} label="Lo que respondió (nota del tutor)" area lim={LIM.notaDefensa} valor={d.notas[p.id] ?? ""} onChange={(v) => nota(p.id, v)} />
+              <div>
+                <span className="etiqueta">¿Cómo respondió?</span>
+                <div className="marcas" role="group" aria-label={`Respuesta a la pregunta ${i + 1}`}>
+                  {(Object.keys(MARCAS) as Marca[]).map((m) => (
+                    <button key={m} className={m} aria-pressed={d.marcas?.[p.id] === m} onClick={() => marcar(p.id, m)}>{MARCAS[m]}</button>
+                  ))}
+                </div>
+                <Campo id={`nota-${p.id}`} label="Nota (opcional)" area lim={[0, LIM.notaDefensa[1]]} valor={d.notas[p.id] ?? ""} onChange={(v) => nota(p.id, v)} />
+              </div>
             </div>
           ))}
 
           {s.demo && (
             <div className="botones">
-              <button className="btn-texto" onClick={() => setS((x) => (x.defensa ? { ...x, defensa: { ...x.defensa, notas: Object.fromEntries(x.defensa.preguntas.map((p, i) => [p.id, NOTAS_DEMO[i]])), alertas: null } } : x))}>
-                Rellenar notas de ejemplo (solo en la demostración)
+              <button className="btn-texto" onClick={() => setS((x) => (x.defensa ? { ...x, defensa: { ...x.defensa, notas: Object.fromEntries(x.defensa.preguntas.map((p, i) => [p.id, NOTAS_DEMO[i]])), marcas: Object.fromEntries(x.defensa.preguntas.map((p) => [p.id, "bien" as Marca])), alertas: null } } : x))}>
+                Rellenar respuestas de ejemplo (solo en la demostración)
               </button>
             </div>
           )}
@@ -486,7 +507,8 @@ function PasoDefensa({ s, setS, irA }: Props) {
             <button className="btn claro" onClick={pedirAlertas} disabled={cargando !== null || anotadas < 4}>
               {cargando === "alertas" ? "Revisando…" : "Pedir a la IA dónde repreguntar"}
             </button>
-            <button className="btn" onClick={() => irA(4)} disabled={!defensaCompleta(d)}>Ir a la firma</button>
+            <button className="btn" onClick={irAFirma} disabled={!defensaCompleta(d)}>Ir a la firma</button>
+            {!defensaCompleta(d) && <p className="falta">Para firmar, marca cómo respondió al menos 4 preguntas (te {4 - anotadas === 1 ? "falta 1" : `faltan ${4 - anotadas}`}).</p>}
           </div>
 
           {d.alertas && (
@@ -551,14 +573,13 @@ function PasoFirma({ s, setS, selloActivo }: Omit<Props, "irA"> & { selloActivo:
           Este enlace es la prueba. Quien lo abra ve qué se vio, qué no, quién firmó, y puede comprobar que nadie cambió una
           letra.
         </p>
-        <div className="botones no-imprimir" style={{ marginTop: 0 }}>
+        <Constancia c={s.emitida.constancia} autentica={null} />
+        <div className="botones no-imprimir">
           <button className="btn" onClick={copiar}>{copiado ? "Copiado ✓" : "Copiar enlace"}</button>
           <a className="btn claro" href={`https://wa.me/?text=${encodeURIComponent(`Mi constancia de PRUEBA VIVA: ${enlace}`)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Mandar por WhatsApp</a>
           <a className="btn claro" href={`/verificar#${s.emitida.fragmento}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Abrir verificación</a>
           <button className="btn-texto" onClick={() => window.print()}>Imprimir</button>
         </div>
-        <p className="enlace no-imprimir">{enlace}</p>
-        <Constancia c={s.emitida.constancia} autentica={null} />
       </>
     );
   }
@@ -584,7 +605,7 @@ function PasoFirma({ s, setS, selloActivo }: Omit<Props, "irA"> & { selloActivo:
 
       <div className="campos" style={{ marginTop: 16 }}>
         <Campo id="firmante" label="Tu nombre y apellido" lim={[3, 80]} valor={f.nombreCompleto} onChange={(v) => set("nombreCompleto", v)}
-          ayuda={`Debe coincidir con el tutor del encargo: ${s.encargo.tutorNombre}.`} />
+          ayuda="Ya viene escrito del encargo. Revisa que seas tú." />
         <Campo id="fcargo" label="Tu cargo" lim={LIM.cargo} valor={f.cargo} onChange={(v) => set("cargo", v)} />
         <Campo id="fnota" label="¿Qué viste en la defensa?" area ancho lim={LIM.notaFirma} valor={f.nota} onChange={(v) => set("nota", v)}
           ayuda="Con tus palabras. Esto aparece en la constancia." />

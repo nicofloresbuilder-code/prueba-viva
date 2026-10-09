@@ -5,7 +5,7 @@
 
 import { criterio, estandar } from "./estandares";
 import type {
-  Alerta, Constancia, Defensa, Encargo, EntradaBitacora, Firma, Pregunta, TipoAlerta, TipoCentro,
+  Alerta, Constancia, Defensa, Encargo, EntradaBitacora, Firma, Marca, Pregunta, TipoAlerta, TipoCentro,
 } from "./types";
 
 /* ───────────── Límites de cada campo (validación de entrada) ───────────── */
@@ -190,10 +190,27 @@ export function validarAlertas(raw: unknown): Alerta[] | null {
   return out;
 }
 
+/* Persona test: Don Rogelio no iba a escribir cinco notas con el pulgar.
+   Ahora basta un toque por pregunta (lo explicó bien / dudó / no supo); la
+   nota escrita es opcional, pero si se escribe tiene límite. */
+export const MARCAS: Record<Marca, string> = { bien: "Lo explicó bien", dudo: "Dudó", "no-supo": "No supo" };
+
+export function respondidas(d: Defensa | null): number {
+  if (!d) return 0;
+  return d.preguntas.filter((p) => Boolean(d.marcas?.[p.id])).length;
+}
+
 export function defensaCompleta(d: Defensa | null): boolean {
   if (!d || d.preguntas.length !== LIM.preguntas) return false;
-  const anotadas = d.preguntas.filter((p) => largo(d.notas[p.id] ?? "", LIM.notaDefensa)).length;
-  return anotadas >= 4;
+  if (Object.values(d.notas ?? {}).some((n) => n.length > LIM.notaDefensa[1])) return false;
+  return respondidas(d) >= 4;
+}
+
+/** Lo que se le manda a la IA de cada respuesta: la marca del tutor y su nota. */
+export function notaParaIA(d: Defensa, id: string): string {
+  const m = d.marcas?.[id];
+  const n = (d.notas?.[id] ?? "").trim();
+  return [m ? `${MARCAS[m]}.` : "", n].filter(Boolean).join(" ");
 }
 
 /* ───────────── SALVAGUARDA 4 — Firma una persona, criterio por criterio ───────────── */
@@ -251,7 +268,7 @@ export function construirConstancia(e: Encargo, b: EntradaBitacora[], d: Defensa
 /** Lo que una constancia nunca prueba, escrito en la constancia misma. */
 export const NO_PRUEBA = [
   "No es una certificación oficial de CONOCER: usa sus criterios, pero no sustituye una evaluación acreditada.",
-  "No prueba nada fuera de este encargo ni de los criterios marcados como vistos.",
+  "No prueba nada fuera de este encargo ni de los criterios que el tutor vio.",
   "El tipo de centro de trabajo es declarado por el tutor; esta app no verifica RFC ni inscripción a JCF.",
   "La IA no calificó a nadie: solo propuso preguntas y señaló posibles contradicciones al tutor.",
 ];
@@ -264,9 +281,9 @@ export function codigoConstancia(rand: () => number = Math.random): string {
 }
 
 export function fmtFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Mexico_City" });
+  return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 }
 
 export function fmtHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", timeZone: "America/Mexico_City" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }

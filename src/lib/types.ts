@@ -38,6 +38,9 @@ export interface Alerta {
   texto: string;
 }
 
+/** Lo que el tutor marca con un toque por pregunta. Es juicio humano, no de la IA. */
+export type Marca = "bien" | "dudo" | "no-supo";
+
 export type FuenteIA = "gemini" | "simulado";
 
 export interface Defensa {
@@ -45,6 +48,7 @@ export interface Defensa {
   fuente: FuenteIA;
   generadas: string;
   notas: Record<string, string>;
+  marcas: Record<string, Marca>;
   alertas: Alerta[] | null;
   fuenteAlertas: FuenteIA | null;
 }

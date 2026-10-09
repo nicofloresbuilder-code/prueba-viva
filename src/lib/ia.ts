@@ -106,7 +106,8 @@ export function alertasSimuladas(e: EntradaAlertas): Alerta[] {
     out.push({ tipo: "ia-sin-explicar", texto: "La bitácora dice que usó IA, pero en las notas no aparece qué revisó o corrigió de lo que produjo." });
   for (const p of e.preguntas) {
     const n = (e.notas[p.id] ?? "").trim();
-    if (n.length < 25) out.push({ tipo: "hueco", texto: `La nota de la pregunta ${p.id.slice(1)} es muy corta. Vale la pena repreguntar con un ejemplo concreto.` });
+    if (!n) out.push({ tipo: "hueco", texto: `La pregunta ${p.id.slice(1)} quedó sin respuesta anotada.` });
+    else if (/^(dud[oó]|no supo)/i.test(n)) out.push({ tipo: "hueco", texto: `En la pregunta ${p.id.slice(1)} marcaste que dudó o no supo. Vale la pena repreguntar con un ejemplo concreto de su bitácora.` });
   }
   return out.slice(0, 5);
 }
