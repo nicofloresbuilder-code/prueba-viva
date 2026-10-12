@@ -4,10 +4,48 @@
 import { revisarTexto, validarEntrada, LIM } from "./motor";
 import type { EntradaPreguntas } from "./ia";
 
-const MODELO = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const BASE = "https://generativelanguage.googleapis.com/v1beta";
+const PREFERIDO = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
 export function hayLlave(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
+}
+
+/* Bug del despliegue: el modelo fijo ("gemini-2.5-flash") respondió 404 porque
+   Google retira modelos. Ahora, si el modelo pedido no existe, se pregunta a la
+   API qué modelos "flash" hay disponibles para esta llave y se usa el primero. */
+let modeloVigente: string | null = null;
+
+async function elegirModelo(llave: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": llave } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const nombres: string[] = (j?.models ?? [])
+      .filter((m: { supportedGenerationMethods?: string[] }) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m: { name: string }) => String(m.name).replace(/^models\//, ""));
+    const flash = nombres.filter((n) => /flash/.test(n) && !/(image|tts|audio|live|exp|preview|lite)/.test(n));
+    return flash.find((n) => /latest/.test(n)) ?? flash.sort().reverse()[0] ?? nombres[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function llamar(modelo: string, llave: string, sistema: string, usuario: string, signal: AbortSignal): Promise<Response> {
+  return fetch(`${BASE}/models/${modelo}:generateContent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": llave },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: sistema }] },
+      contents: [{ role: "user", parts: [{ text: usuario }] }],
+      generationConfig: {
+        responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 4096,
+        // En 2.5 Flash se apaga el "pensamiento" para que no se coma los tokens de la respuesta.
+        ...(/2\.5-flash/.test(modelo) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
+    }),
+    signal,
+  });
 }
 
 /** Llama a Gemini pidiendo JSON. Devuelve el objeto o null si algo falla. */
@@ -15,30 +53,27 @@ export async function gemini(sistema: string, usuario: string): Promise<unknown 
   const llave = process.env.GEMINI_API_KEY;
   if (!llave) return null;
   const ctrl = new AbortController();
-  const reloj = setTimeout(() => ctrl.abort(), 20000);
+  const reloj = setTimeout(() => ctrl.abort(), 25000);
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": llave },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: sistema }] },
-        contents: [{ role: "user", parts: [{ text: usuario }] }],
-        generationConfig: {
-          responseMimeType: "application/json", temperature: 0.4, maxOutputTokens: 4096,
-          // Sin "pensamiento": la tarea es corta y así no se come los tokens de la respuesta.
-          ...(MODELO.includes("2.5-flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-        },
-      }),
-      signal: ctrl.signal,
-    });
+    let modelo = modeloVigente ?? PREFERIDO;
+    let r = await llamar(modelo, llave, sistema, usuario, ctrl.signal);
+    if (r.status === 404 || r.status === 400) {
+      const otro = await elegirModelo(llave);
+      console.error(`Gemini respondió ${r.status} con ${modelo}; se intenta con ${otro}`);
+      if (otro && otro !== modelo) {
+        modelo = otro;
+        r = await llamar(modelo, llave, sistema, usuario, ctrl.signal);
+      }
+    }
     if (!r.ok) {
-      console.error("Gemini respondió", r.status);
+      console.error("Gemini respondió", r.status, "con", modelo);
       return null;
     }
+    modeloVigente = modelo;
     const j = await r.json();
-    const texto: string | undefined = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
+    const texto: string | undefined = j?.candidates?.[0]?.content?.parts?.filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
     if (!texto) return null;
-    return JSON.parse(texto);
+    return JSON.parse(texto.replace(/^```(?:json)?\s*|\s*```$/g, ""));
   } catch (e) {
     console.error("Gemini falló:", (e as Error).name);
     return null;

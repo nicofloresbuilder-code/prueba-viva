@@ -38,7 +38,7 @@ Variables de entorno (en Vercel: Settings → Environment Variables):
 |---|---|---|
 | `GEMINI_API_KEY` | Llave gratuita de Google AI Studio | No: sin ella, las preguntas salen de una plantilla etiquetada SIMULADO |
 | `FIRMA_SECRETA` | Texto aleatorio de 32 caracteres o más para sellar constancias | Sí, para emitir y verificar |
-| `GEMINI_MODEL` | Modelo a usar (por defecto `gemini-2.5-flash`) | No |
+| `GEMINI_MODEL` | Modelo a usar (por defecto `gemini-flash-latest`; si no existe, la app busca un modelo Flash disponible) | No |
 
 ## Estructura
 

@@ -32,6 +32,7 @@
 | El servidor viejo seguía sirviendo un manifiesto anterior (500 en los chunks) | Pase mecánico | Reiniciar el servidor después de cada build |
 | La bitácora se abría sin que el joven confirmara las condiciones | Pase mecánico, ronda 2 | Se exige consentimiento y condiciones vistas |
 | "Decidí: Decidí…" en la bitácora | Persona test, ronda 2 | La etiqueta dice "Decisión:" |
+| En producción, Gemini respondió 404: el modelo fijo `gemini-2.5-flash` ya no existía para la llave | Logs de Vercel tras el primer deploy | Se usa `gemini-flash-latest` y, si da 404, la app pide a la API la lista de modelos Flash y usa el primero disponible |
 | El límite de 20 solicitudes por IP saltó durante las pruebas | Pase mecánico | Es lo esperado: el límite protege la cuota gratuita |
 
 ## Lo que no se construyó
