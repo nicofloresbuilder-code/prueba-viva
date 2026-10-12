@@ -2,6 +2,8 @@
 
 **El módulo de primera prueba de PUENTE MX.**
 
+**En vivo:** https://prueba-viva.vercel.app · **Verificar una constancia:** https://prueba-viva.vercel.app/verificar
+
 Una prueba que la IA no puede hacer por ti. El joven hace un trabajo real, registra en una bitácora cómo lo hizo y lo defiende en vivo frente a quien lo supervisó. Esa persona firma, criterio por criterio, y el joven recibe una constancia que cualquier empresa puede verificar desde un enlace de WhatsApp.
 
 Proyecto de la semana 9 de AI 2041 (capítulo 8, "The Job Savior"). Ataca el vacío de **primera prueba**.

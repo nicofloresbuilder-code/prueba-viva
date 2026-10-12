@@ -1,6 +1,7 @@
 # PACKET — PRUEBA VIVA
 
 **Módulo de primera prueba de PUENTE MX · Semana 9 · AI 2041 Cap. 8 "The Job Savior" · Ship individual · Nicolás Flores**
+**En vivo:** https://prueba-viva.vercel.app · **Código:** https://github.com/nicofloresbuilder-code/prueba-viva
 **Vacío:** primera prueba · **Rol en Brain Bending:** Technologist · **Equipo:** Miguel Bravo (User), Nicolás Flores (Technologist), Regina (Operator), Cristina Meouchi (Adversary)
 
 ---
