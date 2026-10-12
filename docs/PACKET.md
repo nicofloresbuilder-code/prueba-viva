@@ -189,7 +189,9 @@ Si esta rebanada funciona, PUENTE MX se vuelve la capa de evidencia y transició
 
 **Autoprueba del motor:** `npx tsx src/lib/__selftest.ts` da 91 aserciones correctas y 0 fallas.
 
-**Pase mecánico (Playwright contra el build de producción):** pasan las pruebas 1 a 7 y 9 a 18. La 8 (con llave real de Gemini) se corre en el despliegue.
+**Pase mecánico (Playwright contra el build de producción):** pasan las pruebas 1 a 7 y 9 a 18.
+
+**Prueba 8 en la URL en vivo, con Gemini real:** con la bitácora del ejemplo, Gemini propuso 5 preguntas ligadas a criterios, por ejemplo: *"¿Cuáles fueron las tres columnas que te sugirió ChatGPT y por qué decidiste quitarlas de tu hoja de registro?"*. Luego planté una contradicción en las notas ("dijo que no usó ninguna herramienta"). Gemini la marcó como **contradicción** contra la bitácora sin calificar a nadie, y además señaló dos huecos.
 
 **Bugs encontrados y corregidos:**
 
@@ -197,5 +199,9 @@ Si esta rebanada funciona, PUENTE MX se vuelve la capa de evidencia y transició
 - La bitácora se abría aunque el joven no hubiera confirmado las condiciones.
 - Las horas de la bitácora de ejemplo salían de madrugada por la zona horaria.
 - Se apagó el "pensamiento" de Gemini 2.5 Flash para que no trunque el JSON.
+- **En producción:** Gemini respondió 404 porque el modelo fijo estaba retirado. Se cambió a `gemini-flash-latest` con búsqueda automática de un modelo disponible y se volvió a desplegar.
+- **En producción:** después respondió 503 (modelo saturado). Se agregó un reintento y un modelo alterno, se volvió a desplegar y la prueba 8 pasó.
+
+**Despliegues:** 5 en producción (Vercel), cada uno conectado a un push en `main`.
 
 **Persona test:** dos rondas con cinco personas, 37 confusiones registradas y 23 cambios. Ver `docs/PERSONA.md`.
