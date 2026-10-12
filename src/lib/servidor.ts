@@ -24,8 +24,9 @@ async function elegirModelo(llave: string): Promise<string | null> {
     const nombres: string[] = (j?.models ?? [])
       .filter((m: { supportedGenerationMethods?: string[] }) => m.supportedGenerationMethods?.includes("generateContent"))
       .map((m: { name: string }) => String(m.name).replace(/^models\//, ""));
-    const flash = nombres.filter((n) => /flash/.test(n) && !/(image|tts|audio|live|exp|preview|lite)/.test(n));
-    return flash.find((n) => /latest/.test(n)) ?? flash.sort().reverse()[0] ?? nombres[0] ?? null;
+    const flash = nombres.filter((n) => /flash/.test(n) && !/(image|tts|audio|live|exp|preview|latest)/.test(n));
+    // Primero un Flash con versión fija (distinto del alias que pudo fallar), luego cualquiera.
+    return flash.sort().reverse()[0] ?? nombres.find((n) => /flash/.test(n)) ?? null;
   } catch {
     return null;
   }
@@ -57,7 +58,13 @@ export async function gemini(sistema: string, usuario: string): Promise<unknown 
   try {
     let modelo = modeloVigente ?? PREFERIDO;
     let r = await llamar(modelo, llave, sistema, usuario, ctrl.signal);
-    if (r.status === 404 || r.status === 400) {
+    /* En producción, gemini-flash-latest respondió 503 (saturado). Se reintenta
+       una vez y, si sigue saturado, se prueba con otro modelo Flash. */
+    if (r.status === 503 || r.status === 429 || r.status === 500) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      r = await llamar(modelo, llave, sistema, usuario, ctrl.signal);
+    }
+    if (r.status === 404 || r.status === 400 || r.status === 503 || r.status === 500) {
       const otro = await elegirModelo(llave);
       console.error(`Gemini respondió ${r.status} con ${modelo}; se intenta con ${otro}`);
       if (otro && otro !== modelo) {

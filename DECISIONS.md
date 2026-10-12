@@ -33,6 +33,7 @@
 | La bitácora se abría sin que el joven confirmara las condiciones | Pase mecánico, ronda 2 | Se exige consentimiento y condiciones vistas |
 | "Decidí: Decidí…" en la bitácora | Persona test, ronda 2 | La etiqueta dice "Decisión:" |
 | En producción, Gemini respondió 404: el modelo fijo `gemini-2.5-flash` ya no existía para la llave | Logs de Vercel tras el primer deploy | Se usa `gemini-flash-latest` y, si da 404, la app pide a la API la lista de modelos Flash y usa el primero disponible |
+| Después, Gemini respondió 503 (modelo saturado) | Logs de Vercel | Un reintento a los 1.5 s y, si sigue, otro modelo Flash con versión fija; si todo falla, plantilla etiquetada |
 | El límite de 20 solicitudes por IP saltó durante las pruebas | Pase mecánico | Es lo esperado: el límite protege la cuota gratuita |
 
 ## Lo que no se construyó
