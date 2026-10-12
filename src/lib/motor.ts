@@ -5,7 +5,8 @@
 
 import { criterio, estandar } from "./estandares";
 import type {
-  Alerta, Constancia, Defensa, Encargo, EntradaBitacora, Firma, Marca, Pregunta, TipoAlerta, TipoCentro,
+  Alerta, Constancia, Defensa, Encargo, EntradaBitacora, EstadoCaso, Firma, FuenteEvidencia, Marca, Participante, Pregunta, Puente,
+  Resultado, TipoAlerta, TipoCentro, TipoResultado,
 } from "./types";
 
 /* ───────────── Límites de cada campo (validación de entrada) ───────────── */
@@ -26,6 +27,18 @@ export const LIM = {
   entradasMin: 3,
   entradasMax: 30,
   preguntas: 5,
+  pago: [8, 120],
+  alcance: [15, 300],
+  disputa: [15, 200],
+  previa: [10, 200],
+  previasMax: 5,
+  puesto: [3, 80],
+  fuenteDemanda: [15, 300],
+  falta: [10, 200],
+  accion: [15, 300],
+  escalamiento: [15, 200],
+  evidenciaResultado: [15, 300],
+  plazoMaxDias: 90,
 } as const;
 
 function largo(v: string, [min, max]: readonly [number, number]): boolean {
@@ -121,7 +134,15 @@ export function validarEncargo(e: Encargo): string[] {
   if (!largo(e.alias, LIM.alias)) err.push("Escribe cómo quiere aparecer el joven en la constancia (2 a 40 caracteres).");
   if (!nombreCompleto(e.tutorNombre)) err.push("El tutor debe escribir nombre y apellido.");
   if (!largo(e.tutorCargo, LIM.cargo)) err.push("Escribe el cargo del tutor.");
-  for (const t of [e.titulo, e.quienLoNecesitaba, e.centroNombre, e.alias, e.tutorNombre, e.tutorCargo]) {
+  /* Blueprint PUENTE MX, sombra "mano de obra barata": pago, alcance, revisión y
+     ruta de disputa se declaran y se muestran ANTES de empezar. */
+  if (!largo(e.pago ?? "", LIM.pago)) err.push("Escribe cuánto se paga y quién lo paga (o la beca que lo financia).");
+  else if (/\b(gratis|sin pago|no se paga|a prueba|de prueba sin|voluntario)\b/i.test(e.pago)) err.push("Un trabajo sin pago no se pasa como oportunidad. Si no hay pago ni beca, no hay encargo.");
+  if (!largo(e.alcance ?? "", LIM.alcance)) err.push("Escribe el alcance: qué entra y qué no, y cuánto dura (15 a 300 caracteres).");
+  if (!largo(e.rutaDisputa ?? "", LIM.disputa)) err.push("Escribe a quién acude el joven si no está de acuerdo con la revisión o con el pago.");
+  if (!["verificada", "no", "no-se"].includes(e.rutaReal)) err.push("Indica si existe un puesto o ruta real después de este encargo.");
+  if (!e.mostradoAntes) err.push("Confirma que le mostraste al joven el pago, el alcance, los criterios y la ruta de disputa antes de empezar.");
+  for (const t of [e.titulo, e.quienLoNecesitaba, e.centroNombre, e.alias, e.tutorNombre, e.tutorCargo, e.pago ?? "", e.alcance ?? "", e.rutaDisputa ?? ""]) {
     const m = revisarTexto(t);
     if (m) { err.push(EXPLICACION_RECHAZO[m]); break; }
   }
@@ -139,6 +160,27 @@ export function validarEntrada(en: Pick<EntradaBitacora, "que" | "decision" | "u
   if (en.usoIA && !largo(en.paraQueIA, LIM.paraQue)) err.push("Si usaste IA, di para qué (10 a 200 caracteres).");
   for (const t of [en.que, en.decision, en.paraQueIA]) {
     const m = revisarTexto(t);
+    if (m) { err.push(EXPLICACION_RECHAZO[m]); break; }
+  }
+  return err;
+}
+
+/* Blueprint, paso 2: el participante consiente y puede declarar experiencia
+   previa, también informal. Lo que no se verificó aquí se ve como no verificado. */
+export const FUENTE_EVIDENCIA: Record<FuenteEvidencia, { etiqueta: string; confianza: "baja" | "media" }> = {
+  autodeclarada: { etiqueta: "Lo dice el participante (no verificado)", confianza: "baja" },
+  muestra: { etiqueta: "Hay una muestra de trabajo (no revisada aquí)", confianza: "media" },
+  testigo: { etiqueta: "Alguien lo vio, según el participante (no verificado)", confianza: "media" },
+};
+
+export function validarParticipante(p: Participante): string[] {
+  const err: string[] = [];
+  if (!p.consiente) err.push("El participante tiene que aceptar antes de empezar la bitácora.");
+  if (p.previas.length > LIM.previasMax) err.push("Máximo 5 tareas previas.");
+  for (const x of p.previas) {
+    if (!largo(x.tarea, LIM.previa)) { err.push("Cada tarea previa necesita de 10 a 200 caracteres."); break; }
+    if (!(x.fuente in FUENTE_EVIDENCIA)) { err.push("Fuente de evidencia no válida."); break; }
+    const m = revisarTexto(x.tarea);
     if (m) { err.push(EXPLICACION_RECHAZO[m]); break; }
   }
   return err;
@@ -260,6 +302,7 @@ export function construirConstancia(e: Encargo, b: EntradaBitacora[], d: Defensa
     noVistos: e.criterios.filter((id) => f.vistos[id] === "no-visto").map(texto),
     tutor: { nombre: f.nombreCompleto.trim(), cargo: f.cargo.trim() },
     nota: f.nota.trim(),
+    pago: (e.pago ?? "").trim(),
     bitacora: { entradas: b.length, desde: tiempos[0], hasta: tiempos[tiempos.length - 1], conIA: b.filter((x) => x.usoIA).length },
     defensa: { preguntas: d.preguntas.length, fuente: d.fuente },
   };
@@ -271,7 +314,138 @@ export const NO_PRUEBA = [
   "No prueba nada fuera de este encargo ni de los criterios que el tutor vio.",
   "El tipo de centro de trabajo es declarado por el tutor; esta app no verifica RFC ni inscripción a JCF.",
   "La IA no calificó a nadie: solo propuso preguntas y señaló posibles contradicciones al tutor.",
+  "La firma dice lo que el tutor observó; no garantiza desempeño futuro ni un empleo.",
 ];
+
+/* ───────────── BLUEPRINT PUENTE MX · El puente del operador (pasos 5 a 7) ─────────────
+   Una constancia sola no es una transición. Alguien con nombre tiene que convertir
+   la prueba en un siguiente paso concreto y dar seguimiento. Reglas del Blueprint:
+   cada habilidad se liga a evidencia; la demanda tiene fuente o se dice ilustrativa;
+   todo caso tiene responsable, acción, fecha y escalamiento; y nada se marca como
+   éxito solo porque existe una constancia. */
+
+export const PUESTOS_VECINOS: Record<string, string[]> = {
+  EC0305: ["Auxiliar administrativo", "Recepcionista", "Ejecutivo/a de atención a clientes", "Analista de calidad en atención a clientes"],
+  EC0254: ["Agente de ventas telefónicas", "Ejecutivo/a de retención de clientes", "Customer success junior"],
+};
+
+export const DEMANDA = {
+  verificada: "Verificada: hay un empleador u oportunidad pagada concreta, con fuente y fecha.",
+  ilustrativa: "ILUSTRATIVA: es un camino posible, no una vacante. Nadie tiene un lugar reservado.",
+} as const;
+
+export const ESTADOS: Record<EstadoCaso, string> = {
+  abierto: "Abierto",
+  "accion-hecha": "Acción completada",
+  "sin-respuesta-escalado": "Sin respuesta · escalado",
+  cerrado: "Cerrado",
+};
+
+export const RESULTADOS: Record<TipoResultado, string> = {
+  invitacion: "Invitación de un empleador",
+  entrevista: "Entrevista",
+  "prueba-pagada": "Prueba pagada",
+  contratacion: "Contratación",
+  "sin-respuesta": "Sin respuesta",
+};
+
+function fechaValida(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(`${s}T12:00:00`).getTime());
+}
+function dia(s: string): number {
+  return new Date(`${s}T12:00:00`).getTime();
+}
+function hoyISO(ahora: Date): string {
+  const z = (n: number) => String(n).padStart(2, "0");
+  return `${ahora.getFullYear()}-${z(ahora.getMonth() + 1)}-${z(ahora.getDate())}`;
+}
+
+/** Las evidencias que el operador puede usar: lo que el tutor vio, y lo previo marcado como no verificado. */
+export function evidenciasDisponibles(c: Constancia | null, p: Participante): { id: string; texto: string; fuente: string; verificada: boolean }[] {
+  const vistas = (c?.vistos ?? []).map((v) => ({ id: v.id, texto: v.texto, fuente: `Observado por ${c?.tutor.nombre} en el encargo`, verificada: true }));
+  const previas = p.previas.map((x) => ({ id: x.id, texto: x.tarea, fuente: FUENTE_EVIDENCIA[x.fuente].etiqueta, verificada: false }));
+  return [...vistas, ...previas];
+}
+
+export function validarPuente(pu: Puente, c: Constancia | null, p: Participante, ahora: Date): string[] {
+  const err: string[] = [];
+  if (!c) err.push("Primero tiene que existir la constancia: el puente parte de evidencia.");
+  if (!nombreCompleto(pu.coordinador)) err.push("El caso necesita un coordinador con nombre y apellido.");
+  if (!largo(pu.puesto, LIM.puesto)) err.push("Elige un puesto vecino concreto.");
+  const disp = new Set(evidenciasDisponibles(c, p).map((e) => e.id));
+  if (!pu.evidencias.length) err.push("Liga el puesto al menos a una evidencia.");
+  if (pu.evidencias.some((id) => !disp.has(id))) err.push("Hay una evidencia que no existe en el caso.");
+  if (c && !pu.evidencias.some((id) => c.vistos.some((v) => v.id === id)))
+    err.push("Al menos una evidencia tiene que ser algo que el tutor vio; lo autodeclarado solo no basta.");
+  if (pu.demanda === "verificada") {
+    if (!largo(pu.fuenteDemanda, LIM.fuenteDemanda)) err.push("Si la demanda es verificada, di cuál empleador u oportunidad y cómo lo verificaste.");
+    if (!fechaValida(pu.verificadaEl) || dia(pu.verificadaEl) > dia(hoyISO(ahora))) err.push("Pon la fecha en que verificaste la demanda (no puede ser futura).");
+  } else if (pu.demanda !== "ilustrativa") err.push("Indica si la demanda es verificada o ilustrativa.");
+  if (!largo(pu.falta, LIM.falta)) err.push("Escribe la habilidad que falta, una sola y concreta.");
+  if (!largo(pu.accion, LIM.accion)) err.push("Escribe la siguiente acción concreta para cerrar o demostrar esa habilidad.");
+  if (!fechaValida(pu.fechaLimite)) err.push("Pon una fecha límite.");
+  else {
+    const d = (dia(pu.fechaLimite) - dia(hoyISO(ahora))) / 86400000;
+    if (d < 0) err.push("La fecha límite no puede estar en el pasado.");
+    if (d > LIM.plazoMaxDias) err.push("La fecha límite no puede pasar de 90 días: un plazo sin fin no es un plazo.");
+  }
+  if (!largo(pu.escalamiento, LIM.escalamiento)) err.push("Escribe qué pasa si nadie responde: a quién se escala y cuándo.");
+  for (const t of [pu.coordinador, pu.puesto, pu.fuenteDemanda, pu.falta, pu.accion, pu.escalamiento]) {
+    const m = revisarTexto(t);
+    if (m) { err.push(EXPLICACION_RECHAZO[m]); break; }
+  }
+  return err;
+}
+
+const RESULTADO_CON_EMPLEADOR: TipoResultado[] = ["invitacion", "entrevista", "prueba-pagada", "contratacion"];
+
+export function validarResultado(r: Omit<Resultado, "id" | "registrado">, pu: Puente, c: Constancia | null, ahora: Date): string[] {
+  const err: string[] = [];
+  if (!pu.guardado) err.push("Primero guarda el caso.");
+  if (!(r.tipo in RESULTADOS)) err.push("Tipo de resultado no válido.");
+  if (RESULTADO_CON_EMPLEADOR.includes(r.tipo) && pu.demanda !== "verificada")
+    err.push("Con un camino ilustrativo no puede haber invitación, entrevista ni contratación: primero verifica la demanda.");
+  if (!fechaValida(r.fecha)) err.push("Pon la fecha del resultado.");
+  else {
+    if (dia(r.fecha) > dia(hoyISO(ahora))) err.push("No se registran resultados futuros.");
+    if (c && dia(r.fecha) < dia(c.emitida.slice(0, 10))) err.push("El resultado no puede ser anterior a la constancia.");
+  }
+  if (!largo(r.evidencia, LIM.evidenciaResultado)) err.push("Describe la evidencia: qué la confirma (correo, mensaje, recibo) sin pegar datos personales.");
+  if (!nombreCompleto(r.confirmadoPor)) err.push("¿Quién lo confirmó? Nombre y apellido.");
+  const m = revisarTexto(r.evidencia) ?? revisarTexto(r.confirmadoPor);
+  if (m) err.push(EXPLICACION_RECHAZO[m]);
+  return err;
+}
+
+/** Cambios de estado permitidos. Ninguno depende de que exista la constancia. */
+export function puedeCambiarEstado(pu: Puente, a: EstadoCaso, ahora: Date): string | null {
+  if (!pu.guardado) return "Primero guarda el caso.";
+  if (a === "accion-hecha" && pu.estado !== "abierto") return "Solo un caso abierto puede marcar su acción como completada.";
+  if (a === "sin-respuesta-escalado") {
+    const vencido = fechaValida(pu.fechaLimite) && dia(pu.fechaLimite) < dia(hoyISO(ahora));
+    if (!vencido && !pu.resultados.some((r) => r.tipo === "sin-respuesta")) return "Se escala cuando vence la fecha límite o se registra 'sin respuesta'.";
+  }
+  if (a === "cerrado" && !pu.resultados.length) return "No se cierra un caso sin registrar al menos un resultado, aunque sea 'sin respuesta'.";
+  return null;
+}
+
+/** Éxito = prueba pagada o contratación confirmadas. Nunca la constancia sola. */
+export function transicionConfirmada(pu: Puente | null): boolean {
+  return Boolean(pu?.resultados.some((r) => r.tipo === "prueba-pagada" || r.tipo === "contratacion"));
+}
+
+/** La cuenta honesta: siempre con denominador y sin porcentajes inventados. */
+export function cuentaHonesta(c: Constancia | null, pu: Puente | null): { etiqueta: string; valor: string }[] {
+  const n = (b: boolean) => (b ? "1" : "0");
+  const r = (t: TipoResultado) => n(Boolean(pu?.resultados.some((x) => x.tipo === t)));
+  return [
+    { etiqueta: "Casos en este navegador", valor: "1" },
+    { etiqueta: "Constancias emitidas", valor: `${n(Boolean(c))} de 1` },
+    { etiqueta: "Casos con demanda verificada", valor: `${n(Boolean(pu?.guardado && pu.demanda === "verificada"))} de 1` },
+    { etiqueta: "Entrevistas confirmadas", valor: `${r("entrevista")} de 1` },
+    { etiqueta: "Pruebas pagadas o contrataciones", valor: `${n(transicionConfirmada(pu))} de 1` },
+  ];
+}
 
 export function codigoConstancia(rand: () => number = Math.random): string {
   const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

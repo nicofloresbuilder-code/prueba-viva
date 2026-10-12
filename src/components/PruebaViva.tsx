@@ -2,80 +2,48 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Constancia from "./Constancia";
-import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO } from "@/lib/demo";
+import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO, PARTICIPANTE_DEMO, puenteDemo } from "@/lib/demo";
+import PasoPuente from "./PasoPuente";
+import { Campo, Errores } from "./campos";
 import { criterio, ESTANDARES, estandar } from "@/lib/estandares";
 import {
-  defensaCompleta, EXPLICACION_RECHAZO, fmtFecha, fmtHora, LIM, listoParaDefensa, MARCAS, MOTIVO_PRACTICA, notaParaIA, PESO,
-  respondidas, revisarTexto, validarEncargo, validarEntrada, validarFirma,
+  defensaCompleta, fmtFecha, fmtHora, LIM, listoParaDefensa, MARCAS, MOTIVO_PRACTICA, notaParaIA, PESO,
+  FUENTE_EVIDENCIA, respondidas, validarEncargo, validarEntrada, validarFirma, validarParticipante,
 } from "@/lib/motor";
-import type { Constancia as TConstancia, Defensa, Encargo, EntradaBitacora, Firma, FuenteIA, Marca, TipoCentro } from "@/lib/types";
+import type { Constancia as TConstancia, Defensa, Encargo, EntradaBitacora, Firma, FuenteEvidencia, FuenteIA, Marca, Participante, Puente, TipoCentro } from "@/lib/types";
 
 /* ───────────── Estado ───────────── */
 
-interface Estado {
+export interface Estado {
   encargo: Encargo;
   encargoGuardado: boolean;
   bitacora: EntradaBitacora[];
   defensa: Defensa | null;
   firma: Firma;
   emitida: { constancia: TConstancia; fragmento: string } | null;
+  participante: Participante;
+  puente: Puente | null;
   demo: boolean;
 }
 
 const VACIO: Estado = {
   encargo: {
     titulo: "", quienLoNecesitaba: "", origen: "jcf", centroNombre: "", centroTipo: "jcf", estandar: "EC0305",
-    criterios: [], alias: "", tutorNombre: "", tutorCargo: "", creado: "",
+    criterios: [], alias: "", tutorNombre: "", tutorCargo: "",
+    pago: "", alcance: "", rutaDisputa: "", rutaReal: "no-se", mostradoAntes: false, creado: "",
   },
   encargoGuardado: false,
   bitacora: [],
   defensa: null,
   firma: { nombreCompleto: "", cargo: "", vistos: {}, nota: "" },
   emitida: null,
+  participante: { consiente: false, consentidoEn: "", previas: [] },
+  puente: null,
   demo: false,
 };
 
 const LLAVE = "prueba-viva-v1";
-type Paso = 1 | 2 | 3 | 4;
-
-/* ───────────── Campos con filtro de secretos ───────────── */
-
-function Campo(props: {
-  id: string; label: string; ayuda?: string; valor: string; onChange: (v: string) => void;
-  lim: readonly [number, number]; area?: boolean; ancho?: boolean; placeholder?: string;
-}) {
-  const { id, label, ayuda, valor, onChange, lim, area, ancho, placeholder } = props;
-  const [rechazo, setRechazo] = useState<string | null>(null);
-  const n = valor.trim().length;
-  const cambiar = (v: string) => {
-    const m = revisarTexto(v);
-    if (m) { setRechazo(EXPLICACION_RECHAZO[m]); return; }
-    setRechazo(null);
-    onChange(v.slice(0, lim[1] + 50));
-  };
-  return (
-    <div className={`campo${ancho ? " ancho" : ""}`}>
-      <label htmlFor={id}>{label}</label>
-      {ayuda && <p className="ayuda">{ayuda}</p>}
-      {area ? (
-        <textarea id={id} value={valor} placeholder={placeholder} onChange={(e) => cambiar(e.target.value)} maxLength={lim[1] + 50} />
-      ) : (
-        <input id={id} type="text" value={valor} placeholder={placeholder} onChange={(e) => cambiar(e.target.value)} maxLength={lim[1] + 50} />
-      )}
-      {rechazo && <p className="rechazo" role="alert">No se guardó: {rechazo}</p>}
-      <span className={`contador${n > 0 && (n < lim[0] || n > lim[1]) ? " mal" : ""}`}>{n} / {lim[1]}{n > 0 && n < lim[0] ? ` · mínimo ${lim[0]}` : ""}</span>
-    </div>
-  );
-}
-
-function Errores({ lista }: { lista: string[] }) {
-  if (!lista.length) return null;
-  return (
-    <div className="errores" role="alert">
-      {lista.map((e) => <p key={e}>{e}</p>)}
-    </div>
-  );
-}
+export type Paso = 1 | 2 | 3 | 4 | 5;
 
 /* ───────────── Componente principal ───────────── */
 
@@ -93,7 +61,7 @@ export default function PruebaViva() {
         // Hidratar desde localStorage solo puede pasar después de montar (no existe en el servidor).
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setS({ ...VACIO, ...g });
-        setPaso(g.emitida ? 4 : g.defensa ? 3 : g.encargoGuardado ? 2 : 1);
+        setPaso(g.puente ? 5 : g.emitida ? 4 : g.defensa ? 3 : g.encargoGuardado ? 2 : 1);
       }
     } catch { /* sin almacenamiento: se trabaja en memoria */ }
     setCargado(true);
@@ -112,10 +80,11 @@ export default function PruebaViva() {
     2: s.encargoGuardado,
     3: s.encargoGuardado && listoBitacora,
     4: s.encargoGuardado && listoBitacora && listoDefensa,
+    5: Boolean(s.emitida),
   };
 
   const cargarDemo = () => {
-    setS({ ...VACIO, encargo: ENCARGO_DEMO, encargoGuardado: true, bitacora: BITACORA_DEMO, demo: true });
+    setS({ ...VACIO, encargo: ENCARGO_DEMO, encargoGuardado: true, bitacora: BITACORA_DEMO, participante: PARTICIPANTE_DEMO, demo: true });
     setPaso(3);
   };
 
@@ -131,6 +100,7 @@ export default function PruebaViva() {
               </span>
             )}
             {servidor && !servidor.sello && <span className="chip sim">Constancias aún no disponibles</span>}
+            <span className="chip">Módulo de prueba de PUENTE MX</span>
           </div>
         </div>
         <p className="lema">
@@ -151,6 +121,7 @@ export default function PruebaViva() {
           [2, "Bitácora", "Lo llena el joven", listoBitacora],
           [3, "Defensa", "Juntos, en vivo", listoDefensa],
           [4, "Firma", "Firma el tutor", Boolean(s.emitida)],
+          [5, "Siguiente paso", "Coordinadora", Boolean(s.puente?.guardado)],
         ] as [Paso, string, string, boolean][]).map(([n, t, q, hecho]) => (
           <button key={n} className="paso" aria-current={paso === n ? "step" : undefined} disabled={!habilitado[n]} onClick={() => setPaso(n)}>
             <span className="n">0{n}{hecho && <span className="hecho">✓ listo</span>}</span>
@@ -164,7 +135,8 @@ export default function PruebaViva() {
         {paso === 1 && <PasoEncargo s={s} setS={setS} irA={setPaso} cargarDemo={cargarDemo} />}
         {paso === 2 && <PasoBitacora s={s} setS={setS} irA={setPaso} />}
         {paso === 3 && <PasoDefensa s={s} setS={setS} irA={setPaso} />}
-        {paso === 4 && <PasoFirma s={s} setS={setS} selloActivo={servidor?.sello ?? false} />}
+        {paso === 4 && <PasoFirma s={s} setS={setS} irA={setPaso} selloActivo={servidor?.sello ?? false} />}
+        {paso === 5 && <PasoPuente s={s} setS={setS} demoPuente={puenteDemo} />}
       </section>
 
       <Reiniciar onReiniciar={() => { setS(VACIO); setPaso(1); }} />
@@ -311,6 +283,32 @@ function PasoEncargo({ s, setS, irA, cargarDemo }: Props & { cargarDemo: () => v
           <Campo id="tutor" label="Nombre y apellido del tutor" lim={[3, 80]} valor={e.tutorNombre} onChange={(v) => set("tutorNombre", v)} placeholder="Ej. Rogelio Martínez" />
           <Campo id="cargo" label="Cargo del tutor" lim={LIM.cargo} valor={e.tutorCargo} onChange={(v) => set("tutorCargo", v)} placeholder="Ej. Encargado de mostrador" />
         </div>
+
+        <div className="antes">
+          <h3>Antes de empezar, el joven tiene que ver esto</h3>
+          <p className="ayuda">Sin pago no hay encargo: un trabajo gratis &ldquo;a cambio de experiencia&rdquo; no se pasa como oportunidad.</p>
+          <div className="campos">
+            <Campo id="pago" label="¿Cuánto se paga y quién lo paga?" ancho lim={LIM.pago} valor={e.pago} onChange={(v) => set("pago", v)}
+              placeholder="Ej. $1,500 por la semana, los paga la ferretería / beca mensual de JCF" />
+            <Campo id="alcance" label="Alcance: qué entra, qué no y cuánto dura" area ancho lim={LIM.alcance} valor={e.alcance} onChange={(v) => set("alcance", v)} />
+            <Campo id="disputa" label="Si no está de acuerdo con la revisión o el pago, ¿con quién lo habla?" ancho lim={LIM.disputa} valor={e.rutaDisputa} onChange={(v) => set("rutaDisputa", v)} />
+            <div className="campo ancho">
+              <span className="etiqueta">Después de este encargo, ¿hay un puesto o una oportunidad pagada real?</span>
+              <div className="opciones" role="radiogroup">
+                {([["verificada", "Sí, y lo puedo comprobar"], ["no", "No"], ["no-se", "No sé todavía"]] as const).map(([v, t]) => (
+                  <label key={v} className={`opcion${e.rutaReal === v ? " activa" : ""}`}>
+                    <input type="radio" name="rutaReal" checked={e.rutaReal === v} onChange={() => set("rutaReal", v)} /> {t}
+                  </label>
+                ))}
+              </div>
+              <p className="ayuda">Si la respuesta es &ldquo;no&rdquo; o &ldquo;no sé&rdquo;, se le dice así al joven. No se promete un empleo que no existe.</p>
+            </div>
+          </div>
+          <label className="juramento">
+            <input type="checkbox" checked={e.mostradoAntes} onChange={(ev) => set("mostradoAntes", ev.target.checked)} />
+            <span>Le mostré al joven el pago, el alcance, los criterios con los que se revisa y con quién reclamar, antes de que empezara.</span>
+          </label>
+        </div>
       </fieldset>
 
       <Errores lista={errores} />
@@ -355,6 +353,8 @@ function PasoBitacora({ s, setS, irA }: Props) {
         Anota mientras trabajas: qué hiciste y, sobre todo, qué decidiste y por qué. Si usaste IA, dilo y di para qué.
         Usarla no te descalifica; esconderla sí.
       </p>
+      <Consentimiento s={s} setS={setS} bloqueado={bloqueada || n > 0} />
+
       <p className="progreso">{n >= LIM.entradasMin ? `${n} entradas (mínimo ${LIM.entradasMin}) ✓ lista para la defensa` : `${n} de ${LIM.entradasMin} entradas mínimas`}</p>
 
       {n > 0 && (
@@ -375,6 +375,8 @@ function PasoBitacora({ s, setS, irA }: Props) {
 
       {bloqueada ? (
         <p className="exito">La bitácora quedó fija porque ya empezó la defensa.</p>
+      ) : !s.participante.consiente ? (
+        <p className="errores">Para escribir en la bitácora, primero acepta arriba cómo se usa tu información.</p>
       ) : (
         <div className="nueva">
           <h3>Nueva entrada · {fmtHora(new Date().toISOString())}</h3>
@@ -396,6 +398,58 @@ function PasoBitacora({ s, setS, irA }: Props) {
         <button className="btn claro" onClick={() => irA(3)} disabled={!listoParaDefensa(s.bitacora)}>Ir a la defensa</button>
       </div>
     </>
+  );
+}
+
+function Consentimiento({ s, setS, bloqueado }: Omit<Props, "irA"> & { bloqueado: boolean }) {
+  const p = s.participante;
+  const [tarea, setTarea] = useState("");
+  const [fuente, setFuente] = useState<FuenteEvidencia>("autodeclarada");
+  const [err, setErr] = useState<string[]>([]);
+  const setP = (q: Participante) => setS((x) => ({ ...x, participante: q }));
+  const agregar = () => {
+    const nueva = { id: `x${Date.now()}`, tarea, fuente, informal: true };
+    const e = validarParticipante({ ...p, previas: [...p.previas, nueva] });
+    setErr(e);
+    if (e.length) return;
+    setP({ ...p, previas: [...p.previas, nueva] });
+    setTarea("");
+  };
+  return (
+    <div className="antes" style={{ marginTop: 0, marginBottom: 18 }}>
+      <h3>Antes de empezar: tu información es tuya</h3>
+      <label className="juramento" style={{ marginTop: 0 }}>
+        <input type="checkbox" checked={p.consiente} disabled={bloqueado}
+          onChange={(ev) => setP({ ...p, consiente: ev.target.checked, consentidoEn: ev.target.checked ? new Date().toISOString() : "" })} />
+        <span>
+          Acepto que mi tutor lea esta bitácora y que la IA la use para proponer preguntas. La bitácora no sale de este
+          navegador; la constancia solo lleva lo que yo decida compartir y el enlace lo mando yo.
+        </span>
+      </label>
+      <details style={{ marginTop: 12 }}>
+        <summary className="etiqueta" style={{ cursor: "pointer" }}>Opcional: trabajo que ya hiciste antes, también informal ({p.previas.length})</summary>
+        <p className="ayuda" style={{ marginTop: 6 }}>Cuenta aunque no haya sido un empleo. Saldrá como &ldquo;no verificado&rdquo; hasta que alguien lo revise.</p>
+        {p.previas.map((x) => (
+          <p key={x.id} className="previa">
+            {x.tarea} <span className="cod">· {FUENTE_EVIDENCIA[x.fuente].etiqueta}</span>{" "}
+            <button className="btn-texto" onClick={() => setP({ ...p, previas: p.previas.filter((y) => y.id !== x.id) })}>Quitar</button>
+          </p>
+        ))}
+        {p.previas.length < LIM.previasMax && (
+          <div className="campos" style={{ marginTop: 8 }}>
+            <Campo id="previa" label="¿Qué hiciste?" ancho lim={LIM.previa} valor={tarea} onChange={setTarea} placeholder="Ej. Llevé las cuentas del puesto de mi tía los fines de semana" />
+            <div className="campo">
+              <label htmlFor="fuente">¿Cómo se puede comprobar?</label>
+              <select id="fuente" value={fuente} onChange={(ev) => setFuente(ev.target.value as FuenteEvidencia)}>
+                {(Object.keys(FUENTE_EVIDENCIA) as FuenteEvidencia[]).map((k) => <option key={k} value={k}>{FUENTE_EVIDENCIA[k].etiqueta}</option>)}
+              </select>
+            </div>
+            <div className="campo" style={{ justifyContent: "flex-end" }}><button className="btn claro" onClick={agregar}>Agregar</button></div>
+          </div>
+        )}
+        <Errores lista={err} />
+      </details>
+    </div>
   );
 }
 
@@ -534,7 +588,7 @@ function PasoDefensa({ s, setS, irA }: Props) {
 
 /* ───────────── 04 · Firma ───────────── */
 
-function PasoFirma({ s, setS, selloActivo }: Omit<Props, "irA"> & { selloActivo: boolean }) {
+function PasoFirma({ s, setS, irA, selloActivo }: Props & { selloActivo: boolean }) {
   const f = s.firma;
   const [jura, setJura] = useState(false);
   const [errores, setErrores] = useState<string[]>([]);
@@ -552,7 +606,7 @@ function PasoFirma({ s, setS, selloActivo }: Omit<Props, "irA"> & { selloActivo:
     try {
       const r = await fetch("/api/sellar", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ encargo: s.encargo, bitacora: s.bitacora, defensa: s.defensa, firma: f }),
+        body: JSON.stringify({ encargo: s.encargo, bitacora: s.bitacora, defensa: s.defensa, firma: f, participante: s.participante }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "No se pudo sellar.");
@@ -579,6 +633,10 @@ function PasoFirma({ s, setS, selloActivo }: Omit<Props, "irA"> & { selloActivo:
           <a className="btn claro" href={`https://wa.me/?text=${encodeURIComponent(`Mi constancia de PRUEBA VIVA: ${enlace}`)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Mandar por WhatsApp</a>
           <a className="btn claro" href={`/verificar#${s.emitida.fragmento}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Abrir verificación</a>
           <button className="btn-texto" onClick={() => window.print()}>Imprimir</button>
+        </div>
+        <div className="siguiente no-imprimir">
+          <p><b>Una constancia no es un empleo.</b> El siguiente paso lo lleva una coordinadora de PUENTE MX: un puesto vecino concreto, lo que falta, una acción, un responsable y una fecha.</p>
+          <button className="btn sello" onClick={() => irA(5)}>Pasar al siguiente paso</button>
         </div>
       </>
     );

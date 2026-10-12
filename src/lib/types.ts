@@ -12,7 +12,57 @@ export interface Encargo {
   alias: string;
   tutorNombre: string;
   tutorCargo: string;
+  /* Blueprint PUENTE MX, paso 1: se declara ANTES de empezar el trabajo. */
+  pago: string;
+  alcance: string;
+  rutaDisputa: string;
+  rutaReal: "verificada" | "no" | "no-se";
+  mostradoAntes: boolean;
   creado: string;
+}
+
+/* Blueprint, paso 2: intake del participante, con consentimiento. */
+export type FuenteEvidencia = "autodeclarada" | "muestra" | "testigo";
+export interface TareaPrevia {
+  id: string;
+  tarea: string;
+  fuente: FuenteEvidencia;
+  informal: boolean;
+}
+export interface Participante {
+  consiente: boolean;
+  consentidoEn: string;
+  previas: TareaPrevia[];
+}
+
+/* Blueprint, pasos 5 a 7: el puente del operador (rol de Regina). */
+export type TipoDemanda = "verificada" | "ilustrativa";
+export type EstadoCaso = "abierto" | "accion-hecha" | "sin-respuesta-escalado" | "cerrado";
+export type TipoResultado = "invitacion" | "entrevista" | "prueba-pagada" | "contratacion" | "sin-respuesta";
+
+export interface Resultado {
+  id: string;
+  tipo: TipoResultado;
+  fecha: string;
+  evidencia: string;
+  confirmadoPor: string;
+  registrado: string;
+}
+
+export interface Puente {
+  coordinador: string;
+  puesto: string;
+  evidencias: string[];
+  demanda: TipoDemanda;
+  fuenteDemanda: string;
+  verificadaEl: string;
+  falta: string;
+  accion: string;
+  fechaLimite: string;
+  escalamiento: string;
+  estado: EstadoCaso;
+  resultados: Resultado[];
+  guardado: boolean;
 }
 
 export interface EntradaBitacora {
@@ -77,6 +127,7 @@ export interface Constancia {
   noVistos: { id: string; texto: string }[];
   tutor: { nombre: string; cargo: string };
   nota: string;
+  pago: string;
   bitacora: { entradas: number; desde: string; hasta: string; conIA: number };
   defensa: { preguntas: number; fuente: FuenteIA };
 }

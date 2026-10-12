@@ -1,9 +1,10 @@
 /* Autoprueba del motor, sin navegador: npx tsx src/lib/__selftest.ts */
 
-import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO } from "./demo";
+import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO, PARTICIPANTE_DEMO, puenteDemo } from "./demo";
 import { alertasSimuladas, preguntasSimuladas } from "./ia";
 import {
-  codigoConstancia, construirConstancia, defensaCompleta, notaParaIA, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
+  codigoConstancia, construirConstancia, cuentaHonesta, defensaCompleta, evidenciasDisponibles, notaParaIA, puedeCambiarEstado,
+  transicionConfirmada, validarParticipante, validarPuente, validarResultado, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
   respuestaTraeCalificacion, revisarTexto, validarAlertas, validarEncargo, validarEntrada, validarFirma, validarPreguntas,
 } from "./motor";
 import { canonico, deB64url, fragmento, sellar, sellosIguales } from "./sello";
@@ -105,6 +106,40 @@ prueba("cambiar una letra rompe el sello", !sellosIguales(s, sellar({ ...c, alia
 prueba("otra llave no reproduce el sello", !sellosIguales(s, sellar(c, "otra-llave")));
 const [cuerpo, sello] = fragmento(c, s).split(".");
 prueba("el enlace se puede leer de vuelta", JSON.parse(deB64url(cuerpo)).codigo === c.codigo && sello === s);
+
+/* Blueprint PUENTE MX: intake, consentimiento y el puente del operador */
+prueba("encargo sin pago se rechaza", validarEncargo({ ...ENCARGO_DEMO, pago: "" }).length > 0);
+prueba("encargo 'gratis' se rechaza", validarEncargo({ ...ENCARGO_DEMO, pago: "Es gratis, a cambio de experiencia" }).length > 0);
+prueba("sin ruta de disputa se rechaza", validarEncargo({ ...ENCARGO_DEMO, rutaDisputa: "" }).length > 0);
+prueba("sin alcance se rechaza", validarEncargo({ ...ENCARGO_DEMO, alcance: "poco" }).length > 0);
+prueba("sin mostrarlo antes de empezar se rechaza", validarEncargo({ ...ENCARGO_DEMO, mostradoAntes: false }).length > 0);
+prueba("participante de ejemplo es válido", validarParticipante(PARTICIPANTE_DEMO).length === 0);
+prueba("sin consentimiento no hay bitácora", validarParticipante({ ...PARTICIPANTE_DEMO, consiente: false }).length > 0);
+prueba("lo previo aparece como no verificado", evidenciasDisponibles(c, PARTICIPANTE_DEMO).filter((e) => !e.verificada).length === 2);
+const hoy = new Date();
+const pu = puenteDemo();
+prueba("el puente de ejemplo es válido", validarPuente(pu, c, PARTICIPANTE_DEMO, hoy).length === 0);
+prueba("sin constancia no hay puente", validarPuente(pu, null, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("solo evidencia autodeclarada no basta", validarPuente({ ...pu, evidencias: ["x1"] }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("evidencia inexistente se rechaza", validarPuente({ ...pu, evidencias: ["E1034-1"] }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("coordinador sin apellido se rechaza", validarPuente({ ...pu, coordinador: "Laura" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("demanda verificada exige fuente y fecha", validarPuente({ ...pu, demanda: "verificada" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+const ayer = new Date(hoy.getTime() - 86400000).toISOString().slice(0, 10);
+prueba("demanda verificada con fuente y fecha pasa", validarPuente({ ...pu, demanda: "verificada", fuenteDemanda: "Despacho contable inventado confirmó por correo que contrata auxiliares en noviembre.", verificadaEl: ayer }, c, PARTICIPANTE_DEMO, hoy).length === 0);
+prueba("fecha límite a más de 90 días se rechaza", validarPuente({ ...pu, fechaLimite: "2099-01-01" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("fecha límite pasada se rechaza", validarPuente({ ...pu, fechaLimite: "2020-01-01" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("sin escalamiento se rechaza", validarPuente({ ...pu, escalamiento: "" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+const guardado = { ...pu, guardado: true };
+const hoyS = hoy.toISOString().slice(0, 10);
+prueba("con camino ilustrativo no hay entrevista", validarResultado({ tipo: "entrevista", fecha: hoyS, evidencia: "Correo del empleador con fecha y hora de la entrevista.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length > 0);
+prueba("con camino ilustrativo sí se registra 'sin respuesta'", validarResultado({ tipo: "sin-respuesta", fecha: hoyS, evidencia: "Se mandó la constancia a tres contactos y nadie contestó en 14 días.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length === 0);
+prueba("resultado futuro se rechaza", validarResultado({ tipo: "sin-respuesta", fecha: "2099-01-01", evidencia: "Se mandó la constancia a tres contactos y nadie contestó.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length > 0);
+prueba("no se cierra sin resultado", puedeCambiarEstado(guardado, "cerrado", hoy) !== null);
+prueba("no se escala antes de tiempo", puedeCambiarEstado(guardado, "sin-respuesta-escalado", hoy) !== null);
+prueba("la constancia sola no es transición", !transicionConfirmada(guardado));
+prueba("una prueba pagada sí es transición", transicionConfirmada({ ...guardado, resultados: [{ id: "r", tipo: "prueba-pagada", fecha: hoyS, evidencia: "Recibo del pago.", confirmadoPor: "Laura Méndez", registrado: hoyS }] }));
+prueba("la cuenta honesta lleva denominador", cuentaHonesta(c, guardado).every((f) => f.etiqueta.startsWith("Casos en") || f.valor.includes(" de ")));
+prueba("la cuenta no inventa porcentajes", !cuentaHonesta(c, guardado).some((f) => f.valor.includes("%")));
 
 console.log(`${ok} aserciones correctas, ${mal} fallas`);
 if (mal) process.exit(1);

@@ -57,6 +57,7 @@ export default function Constancia({ c, autentica }: { c: C; autentica: boolean 
 
       <h3>Para qué se hizo</h3>
       <p>{c.quienLoNecesitaba}</p>
+      {c.pago && <p className="cod">Pago declarado antes de empezar: {c.pago}</p>}
 
       <h3>Cómo se comprobó</h3>
       <p>
