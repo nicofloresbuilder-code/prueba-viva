@@ -168,9 +168,9 @@ export function validarEntrada(en: Pick<EntradaBitacora, "que" | "decision" | "u
 /* Blueprint, paso 2: el participante consiente y puede declarar experiencia
    previa, también informal. Lo que no se verificó aquí se ve como no verificado. */
 export const FUENTE_EVIDENCIA: Record<FuenteEvidencia, { etiqueta: string; confianza: "baja" | "media" }> = {
-  autodeclarada: { etiqueta: "Lo dice el participante (no verificado)", confianza: "baja" },
+  autodeclarada: { etiqueta: "Autodeclarado (no verificado)", confianza: "baja" },
   muestra: { etiqueta: "Hay una muestra de trabajo (no revisada aquí)", confianza: "media" },
-  testigo: { etiqueta: "Alguien lo vio, según el participante (no verificado)", confianza: "media" },
+  testigo: { etiqueta: "Hay alguien que lo vio (no verificado)", confianza: "media" },
 };
 
 export function validarParticipante(p: Participante): string[] {

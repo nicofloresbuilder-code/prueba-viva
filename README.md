@@ -1,5 +1,7 @@
 # PRUEBA VIVA
 
+**El módulo de primera prueba de PUENTE MX.**
+
 Una prueba que la IA no puede hacer por ti. El joven hace un trabajo real, registra en una bitácora cómo lo hizo y lo defiende en vivo frente a quien lo supervisó. Esa persona firma, criterio por criterio, y el joven recibe una constancia que cualquier empresa puede verificar desde un enlace de WhatsApp.
 
 Proyecto de la semana 9 de AI 2041 (capítulo 8, "The Job Savior"). Ataca el vacío de **primera prueba**.
@@ -15,6 +17,9 @@ La IA se está comiendo los empleos de entrada que antes daban la primera prueba
 3. **Defensa** (juntos): Gemini lee la bitácora y propone 5 preguntas. El tutor marca cómo respondió cada una. Si se le pide, la IA señala dónde repreguntar. **La IA nunca califica.**
 4. **Firma** (tutor): criterio por criterio, "lo vi" o "no lo vi". El servidor sella la constancia con HMAC.
 5. **Verificación**: `/verificar#…` comprueba que la constancia salió de aquí y que nadie la editó.
+6. **Siguiente paso** (coordinadora de PUENTE MX): el caso pasa a un puesto vecino ligado a la evidencia, con demanda verificada o marcada ILUSTRATIVA, la habilidad que falta, una acción, una fecha, a quién se escala y un seguimiento confirmado por un tercero. Una constancia nunca cuenta como empleo.
+
+Antes del paso 1 se declaran el pago, el alcance y la ruta de reclamo, y el joven confirma que los vio. Sin pago no hay encargo.
 
 ## Correrlo
 
@@ -22,7 +27,7 @@ La IA se está comiendo los empleos de entrada que antes daban la primera prueba
 npm install
 cp .env.example .env.local   # y pon tus valores
 npm run dev                   # http://localhost:3000
-npx tsx src/lib/__selftest.ts # 57 aserciones del motor
+npx tsx src/lib/__selftest.ts # 91 aserciones del motor
 ```
 
 Variables de entorno (en Vercel: Settings → Environment Variables):
@@ -42,9 +47,10 @@ Variables de entorno (en Vercel: Settings → Environment Variables):
 | `src/lib/ia.ts` | Prompts para Gemini y el respaldo simulado |
 | `src/lib/sello.ts` | Sello HMAC-SHA256 y formato del enlace |
 | `src/app/api/*` | Preguntas, alertas, sellar, verificar y estado |
-| `src/components/PruebaViva.tsx` | Las cuatro pantallas |
+| `src/components/PruebaViva.tsx` | Pasos 1 a 4 |
+| `src/components/PasoPuente.tsx` | Paso 5: la coordinadora, el seguimiento y la cuenta honesta |
 | `docs/PACKET.md` | El paquete antes del código, con diagramas |
-| `docs/PERSONA.md` | El persona test y los cambios que produjo |
+| `docs/PERSONA.md` | Las dos rondas del persona test y los cambios que produjeron |
 | `DECISIONS.md` | Decisiones, bugs y lo que no se construyó |
 
 ## Datos y seguridad

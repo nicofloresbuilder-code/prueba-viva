@@ -1,5 +1,7 @@
 # DECISIONS — PRUEBA VIVA
 
+*Módulo de primera prueba de PUENTE MX (Blueprint del equipo, semana 9).*
+
 ## Decisiones
 
 1. **No es un marketplace.** En la pelea de Brain Bending salió que conectar encargos pagados con jóvenes ya existe en plataformas de freelance, y que se acerca a una bolsa de trabajo (zona prohibida). PRUEBA VIVA es una capa de prueba que se pega donde el trabajo ya ocurre; el primer lugar es Jóvenes Construyendo el Futuro.
@@ -12,6 +14,13 @@
 8. **El peso de la firma es declarado y así se dice.** No se verifica RFC ni inscripción a JCF; la constancia lo declara en el texto.
 9. **Firma solo quien supervisó:** el nombre tiene que coincidir con el del tutor del encargo (sin importar acentos ni mayúsculas).
 10. **Sin teléfono ni correo en ningún campo.** El filtro de secretos de ESCUDO (semana 8) se amplió con teléfonos, correos y llaves de Google.
+11. **PRUEBA VIVA es el módulo de primera prueba de PUENTE MX.** El Blueprint fija primera prueba como vacío principal, micro-experiencia como entrada y el puente del operador como paso obligatorio. Por eso la app no termina en la constancia: tiene un paso 5 para la coordinadora.
+12. **Sin pago no hay encargo.** El pago, el alcance, los criterios y la ruta de reclamo se declaran antes de empezar, y el joven confirma que los vio (sombra "mano de obra barata", §9).
+13. **La IA es opcional para el joven.** Si no la autoriza, su bitácora no sale al modelo y las preguntas salen de una plantilla, etiquetada en pantalla.
+14. **Demanda verificada o ILUSTRATIVA, nunca a medias.** "Verificada" exige fuente y fecha. Con demanda ilustrativa no se pueden registrar invitaciones, entrevistas ni contratación (sombra "falsa esperanza").
+15. **Nadie confirma su propio resultado.** La coordinadora solo puede registrar "sin respuesta"; lo demás lo confirma un tercero. Cerrar exige motivo, y los cerrados siguen en la cuenta.
+16. **Éxito = prueba pagada o contratación confirmada.** Una constancia o un caso abierto nunca cuentan como empleo.
+17. **Experiencia informal sí, pero visible como no verificada.** Al menos una evidencia del caso tiene que ser algo que el tutor vio.
 
 ## Bugs
 
@@ -21,13 +30,16 @@
 | 5 alertas de "hueco" llenaban el cupo antes que la alerta de IA sin explicar | Autoprueba | La alerta de IA va primero |
 | Horas de madrugada en la bitácora de ejemplo | Persona test (Dany) | Se dejó de forzar la zona horaria |
 | El servidor viejo seguía sirviendo un manifiesto anterior (500 en los chunks) | Pase mecánico | Reiniciar el servidor después de cada build |
+| La bitácora se abría sin que el joven confirmara las condiciones | Pase mecánico, ronda 2 | Se exige consentimiento y condiciones vistas |
+| "Decidí: Decidí…" en la bitácora | Persona test, ronda 2 | La etiqueta dice "Decisión:" |
 | El límite de 20 solicitudes por IP saltó durante las pruebas | Pase mecánico | Es lo esperado: el límite protege la cuota gratuita |
 
 ## Lo que no se construyó
 
-Cuentas, base de datos, video de la defensa, verificación de RFC o de JCF, emisión como credencial W3C VC 2.0, historial de tutores y contacto del tutor en la constancia.
+Cuentas, base de datos, video de la defensa, verificación de RFC o de JCF, emisión como credencial W3C VC 2.0, historial de tutores, contacto del tutor en la constancia, subir archivos de evidencia, una vista del caso para el joven, pagos reales, conexión con empleadores y la alerta temprana de desplazamiento de Cristina (extensión posterior según el Blueprint).
 
 ## Cierre de sesión
 
-- **Hoy:** packet, motor con 57 aserciones, las cuatro pantallas, la verificación, el pase mecánico y el persona test con 9 cambios.
-- **Primer paso de mañana:** configurar `GEMINI_API_KEY` y `FIRMA_SECRETA` en Vercel, correr la prueba 6 con Gemini real y anotar la respuesta.
+- **Sesión 1:** packet, motor, cuatro pantallas, verificación, pase mecánico y persona test (9 cambios).
+- **Sesión 2 (con el Blueprint):** intake con pago y reclamo, consentimiento, paso 5 de la coordinadora, cuenta honesta, persona test ronda 2 (14 cambios) y motor con 91 aserciones.
+- **Primer paso de mañana:** hacer push, configurar `GEMINI_API_KEY` y `FIRMA_SECRETA` en Vercel, correr la prueba 8 con Gemini real y anotar la respuesta. Después, una vista del caso para el joven.
