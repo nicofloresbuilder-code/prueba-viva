@@ -4,7 +4,7 @@ import { BITACORA_DEMO, ENCARGO_DEMO, NOTAS_DEMO, PARTICIPANTE_DEMO, puenteDemo 
 import { alertasSimuladas, preguntasSimuladas } from "./ia";
 import {
   codigoConstancia, construirConstancia, cuentaHonesta, defensaCompleta, evidenciasDisponibles, notaParaIA, puedeCambiarEstado,
-  transicionConfirmada, validarParticipante, validarPuente, validarResultado, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
+  puedeCerrar, transicionConfirmada, validarParticipante, validarPuente, validarResultado, listoParaDefensa, MOTIVO_PRACTICA, nombreCompleto,
   respuestaTraeCalificacion, revisarTexto, validarAlertas, validarEncargo, validarEntrada, validarFirma, validarPreguntas,
 } from "./motor";
 import { canonico, deB64url, fragmento, sellar, sellosIguales } from "./sello";
@@ -132,6 +132,13 @@ prueba("sin escalamiento se rechaza", validarPuente({ ...pu, escalamiento: "" },
 const guardado = { ...pu, guardado: true };
 const hoyS = hoy.toISOString().slice(0, 10);
 prueba("con camino ilustrativo no hay entrevista", validarResultado({ tipo: "entrevista", fecha: hoyS, evidencia: "Correo del empleador con fecha y hora de la entrevista.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length > 0);
+prueba("la coordinadora no confirma su propia entrevista", validarResultado({ tipo: "entrevista", fecha: hoyS, evidencia: "Correo del empleador con fecha y hora de la entrevista.", confirmadoPor: "Laura Méndez" }, { ...guardado, demanda: "verificada" }, c, hoy).some((e) => e.includes("distinto")));
+prueba("un tercero sí confirma la entrevista", validarResultado({ tipo: "entrevista", fecha: hoyS, evidencia: "Correo del empleador con fecha y hora de la entrevista.", confirmadoPor: "Rogelio Martínez" }, { ...guardado, demanda: "verificada" }, c, hoy).length === 0);
+prueba("escalar a la misma coordinadora se rechaza", validarPuente({ ...pu, escalaA: "Laura Méndez" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("escalar sin nombre se rechaza", validarPuente({ ...pu, escalaA: "" }, c, PARTICIPANTE_DEMO, hoy).length > 0);
+prueba("cerrar sin motivo se rechaza", puedeCerrar({ ...guardado, resultados: [{ id: "r", tipo: "sin-respuesta", fecha: hoyS, evidencia: "Nadie contestó en 14 días.", confirmadoPor: "Laura Méndez", registrado: hoyS }] }, "", hoy) !== null);
+prueba("cerrar como transición sin confirmarla se rechaza", puedeCerrar({ ...guardado, resultados: [{ id: "r", tipo: "sin-respuesta", fecha: hoyS, evidencia: "Nadie contestó en 14 días.", confirmadoPor: "Laura Méndez", registrado: hoyS }] }, "transicion", hoy) !== null);
+prueba("sin ver las condiciones no hay bitácora", validarParticipante({ ...PARTICIPANTE_DEMO, vioCondiciones: false }).length > 0);
 prueba("con camino ilustrativo sí se registra 'sin respuesta'", validarResultado({ tipo: "sin-respuesta", fecha: hoyS, evidencia: "Se mandó la constancia a tres contactos y nadie contestó en 14 días.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length === 0);
 prueba("resultado futuro se rechaza", validarResultado({ tipo: "sin-respuesta", fecha: "2099-01-01", evidencia: "Se mandó la constancia a tres contactos y nadie contestó.", confirmadoPor: "Laura Méndez" }, guardado, c, hoy).length > 0);
 prueba("no se cierra sin resultado", puedeCambiarEstado(guardado, "cerrado", hoy) !== null);

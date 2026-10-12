@@ -31,12 +31,17 @@ export interface TareaPrevia {
 }
 export interface Participante {
   consiente: boolean;
+  /** Opcional: si dice que no, las preguntas salen de plantilla y nada se manda al modelo. */
+  iaPermitida: boolean;
+  /** El joven mismo confirma que vio pago, alcance y a quién reclamar. */
+  vioCondiciones: boolean;
   consentidoEn: string;
   previas: TareaPrevia[];
 }
 
 /* Blueprint, pasos 5 a 7: el puente del operador (rol de Regina). */
 export type TipoDemanda = "verificada" | "ilustrativa";
+export type MotivoCierre = "transicion" | "sin-respuesta" | "ya-no-quiere" | "otro";
 export type EstadoCaso = "abierto" | "accion-hecha" | "sin-respuesta-escalado" | "cerrado";
 export type TipoResultado = "invitacion" | "entrevista" | "prueba-pagada" | "contratacion" | "sin-respuesta";
 
@@ -60,6 +65,8 @@ export interface Puente {
   accion: string;
   fechaLimite: string;
   escalamiento: string;
+  escalaA: string;
+  motivoCierre: MotivoCierre | "";
   estado: EstadoCaso;
   resultados: Resultado[];
   guardado: boolean;

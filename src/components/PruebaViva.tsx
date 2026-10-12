@@ -37,7 +37,7 @@ const VACIO: Estado = {
   defensa: null,
   firma: { nombreCompleto: "", cargo: "", vistos: {}, nota: "" },
   emitida: null,
-  participante: { consiente: false, consentidoEn: "", previas: [] },
+  participante: { consiente: false, iaPermitida: false, vioCondiciones: false, consentidoEn: "", previas: [] },
   puente: null,
   demo: false,
 };
@@ -288,10 +288,11 @@ function PasoEncargo({ s, setS, irA, cargarDemo }: Props & { cargarDemo: () => v
           <h3>Antes de empezar, el joven tiene que ver esto</h3>
           <p className="ayuda">Sin pago no hay encargo: un trabajo gratis &ldquo;a cambio de experiencia&rdquo; no se pasa como oportunidad.</p>
           <div className="campos">
-            <Campo id="pago" label="¿Cuánto se paga y quién lo paga?" ancho lim={LIM.pago} valor={e.pago} onChange={(v) => set("pago", v)}
+            <Campo id="pago" label="¿Cuánto se paga y quién lo paga?" area ancho lim={LIM.pago} valor={e.pago} onChange={(v) => set("pago", v)}
               placeholder="Ej. $1,500 por la semana, los paga la ferretería / beca mensual de JCF" />
             <Campo id="alcance" label="Alcance: qué entra, qué no y cuánto dura" area ancho lim={LIM.alcance} valor={e.alcance} onChange={(v) => set("alcance", v)} />
-            <Campo id="disputa" label="Si no está de acuerdo con la revisión o el pago, ¿con quién lo habla?" ancho lim={LIM.disputa} valor={e.rutaDisputa} onChange={(v) => set("rutaDisputa", v)} />
+            <Campo id="disputa" label="Si no está de acuerdo con la revisión o el pago, ¿con quién lo habla?" area ancho lim={LIM.disputa} valor={e.rutaDisputa} onChange={(v) => set("rutaDisputa", v)}
+              ayuda="Además de esto, el joven siempre puede escribir a la coordinación de PUENTE MX, y el tutor no ve su queja." />
             <div className="campo ancho">
               <span className="etiqueta">Después de este encargo, ¿hay un puesto o una oportunidad pagada real?</span>
               <div className="opciones" role="radiogroup">
@@ -363,7 +364,7 @@ function PasoBitacora({ s, setS, irA }: Props) {
             <li key={b.id} className="entrada">
               <span className="hora">{fmtFecha(b.t)} · {fmtHora(b.t)}</span>
               <p>{b.que}</p>
-              <p className="dec">Decidí: {b.decision}</p>
+              <p className="dec">Decisión: {b.decision}</p>
               {b.usoIA && <span className="ia-uso">Usé IA para: {b.paraQueIA}</span>}
               {!bloqueada && (
                 <div><button className="btn-texto" onClick={() => setS((x) => ({ ...x, bitacora: x.bitacora.filter((y) => y.id !== b.id) }))}>Quitar</button></div>
@@ -375,8 +376,8 @@ function PasoBitacora({ s, setS, irA }: Props) {
 
       {bloqueada ? (
         <p className="exito">La bitácora quedó fija porque ya empezó la defensa.</p>
-      ) : !s.participante.consiente ? (
-        <p className="errores">Para escribir en la bitácora, primero acepta arriba cómo se usa tu información.</p>
+      ) : !(s.participante.consiente && s.participante.vioCondiciones) ? (
+        <p className="errores">Para escribir en la bitácora, primero confirma arriba que viste las condiciones y que tu tutor puede leerla.</p>
       ) : (
         <div className="nueva">
           <h3>Nueva entrada · {fmtHora(new Date().toISOString())}</h3>
@@ -417,15 +418,28 @@ function Consentimiento({ s, setS, bloqueado }: Omit<Props, "irA"> & { bloqueado
   };
   return (
     <div className="antes" style={{ marginTop: 0, marginBottom: 18 }}>
-      <h3>Antes de empezar: tu información es tuya</h3>
-      <label className="juramento" style={{ marginTop: 0 }}>
+      <h3>Antes de empezar</h3>
+      <div className="condiciones">
+        <p><b>Te pagan:</b> {s.encargo.pago}</p>
+        <p><b>Qué entra y qué no:</b> {s.encargo.alcance}</p>
+        <p><b>Si no estás de acuerdo:</b> {s.encargo.rutaDisputa} También puedes escribir a la coordinación de PUENTE MX; tu tutor no ve tu queja.</p>
+      </div>
+      <label className="juramento">
+        <input type="checkbox" checked={p.vioCondiciones} disabled={bloqueado}
+          onChange={(ev) => setP({ ...p, vioCondiciones: ev.target.checked })} />
+        <span>Vi cuánto me pagan, qué entra en el trabajo y a quién reclamar.</span>
+      </label>
+      <label className="juramento">
         <input type="checkbox" checked={p.consiente} disabled={bloqueado}
           onChange={(ev) => setP({ ...p, consiente: ev.target.checked, consentidoEn: ev.target.checked ? new Date().toISOString() : "" })} />
-        <span>
-          Acepto que mi tutor lea esta bitácora y que la IA la use para proponer preguntas. La bitácora no sale de este
-          navegador; la constancia solo lleva lo que yo decida compartir y el enlace lo mando yo.
-        </span>
+        <span>Mi tutor puede leer mi bitácora. <span className="ayuda">(Obligatorio: sin esto no hay defensa.)</span></span>
       </label>
+      <label className="juramento">
+        <input type="checkbox" checked={p.iaPermitida} disabled={Boolean(s.defensa)}
+          onChange={(ev) => setP({ ...p, iaPermitida: ev.target.checked })} />
+        <span>La IA puede leer mi bitácora para proponer las preguntas. <span className="ayuda">(Opcional: si dices que no, las preguntas salen de una plantilla y nada se manda al modelo.)</span></span>
+      </label>
+      <p className="ayuda" style={{ marginTop: 8 }}>La bitácora no sale de este dispositivo. La constancia la mandas tú.</p>
       <details style={{ marginTop: 12 }}>
         <summary className="etiqueta" style={{ cursor: "pointer" }}>Opcional: trabajo que ya hiciste antes, también informal ({p.previas.length})</summary>
         <p className="ayuda" style={{ marginTop: 6 }}>Cuenta aunque no haya sido un empleo. Saldrá como &ldquo;no verificado&rdquo; hasta que alguien lo revise.</p>
@@ -461,10 +475,11 @@ function PasoDefensa({ s, setS, irA }: Props) {
   const d = s.defensa;
 
   const cuerpo = useMemo(() => ({
+    sinIA: !s.participante.iaPermitida,
     encargo: s.encargo.titulo,
     criterios: s.encargo.criterios,
     bitacora: s.bitacora.map(({ t, que, decision, usoIA, paraQueIA }) => ({ t, que, decision, usoIA, paraQueIA })),
-  }), [s.encargo, s.bitacora]);
+  }), [s.encargo, s.bitacora, s.participante.iaPermitida]);
 
   const pedirPreguntas = async () => {
     setCargando("preguntas"); setError(null);
@@ -524,7 +539,7 @@ function PasoDefensa({ s, setS, irA }: Props) {
         <>
           <div className="estado" style={{ marginTop: 0, marginBottom: 6 }}>
             <span className={`chip ${d.fuente === "gemini" ? "ok" : "sim"}`}>
-              Preguntas: {d.fuente === "gemini" ? "propuestas por Gemini" : "SIMULADAS (plantilla, no es IA)"}
+              Preguntas: {d.fuente === "gemini" ? "propuestas por Gemini" : s.participante.iaPermitida ? "SIMULADAS (plantilla, no es IA)" : "de plantilla (el joven no autorizó la IA)"}
             </span>
             <span className="chip">{anotadas} de 5 respondidas · mínimo 4</span>
           </div>
@@ -635,8 +650,8 @@ function PasoFirma({ s, setS, irA, selloActivo }: Props & { selloActivo: boolean
           <button className="btn-texto" onClick={() => window.print()}>Imprimir</button>
         </div>
         <div className="siguiente no-imprimir">
-          <p><b>Una constancia no es un empleo.</b> El siguiente paso lo lleva una coordinadora de PUENTE MX: un puesto vecino concreto, lo que falta, una acción, un responsable y una fecha.</p>
-          <button className="btn sello" onClick={() => irA(5)}>Pasar al siguiente paso</button>
+          <p><b>Una constancia no es un empleo.</b> Lo que sigue lo lleva una coordinadora de PUENTE MX: un puesto vecino concreto, lo que te falta, una acción, quién responde y para cuándo. Tú recibes el resumen del caso.</p>
+          <button className="btn sello" onClick={() => irA(5)}>Entregar a la coordinadora de PUENTE MX</button>
         </div>
       </>
     );

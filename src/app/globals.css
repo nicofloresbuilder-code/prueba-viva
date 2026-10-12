@@ -219,3 +219,6 @@ input[type="date"] { border: 1.5px solid var(--tinta); border-radius: 0; backgro
   .paso:nth-child(2n+1) { border-right: 1.5px solid var(--tinta); }
   .paso:last-child { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
 }
+.condiciones { border-left: 4px solid var(--tinta); padding: 4px 0 4px 12px; margin: 6px 0 4px; font-size: 15px; }
+.condiciones p { margin: 0 0 4px; }
+.aviso-local { border: 1.5px dashed var(--ambar); background: var(--ambar-claro); padding: 8px 12px; font-size: 14px; margin-top: 14px; }

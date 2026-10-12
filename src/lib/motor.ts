@@ -6,7 +6,7 @@
 import { criterio, estandar } from "./estandares";
 import type {
   Alerta, Constancia, Defensa, Encargo, EntradaBitacora, EstadoCaso, Firma, FuenteEvidencia, Marca, Participante, Pregunta, Puente,
-  Resultado, TipoAlerta, TipoCentro, TipoResultado,
+  MotivoCierre, Resultado, TipoAlerta, TipoCentro, TipoResultado,
 } from "./types";
 
 /* ───────────── Límites de cada campo (validación de entrada) ───────────── */
@@ -175,7 +175,8 @@ export const FUENTE_EVIDENCIA: Record<FuenteEvidencia, { etiqueta: string; confi
 
 export function validarParticipante(p: Participante): string[] {
   const err: string[] = [];
-  if (!p.consiente) err.push("El participante tiene que aceptar antes de empezar la bitácora.");
+  if (!p.consiente) err.push("Tienes que aceptar que tu tutor lea tu bitácora: sin eso no hay defensa.");
+  if (!p.vioCondiciones) err.push("Confirma que viste cuánto te pagan, qué entra en el trabajo y a quién reclamar.");
   if (p.previas.length > LIM.previasMax) err.push("Máximo 5 tareas previas.");
   for (const x of p.previas) {
     if (!largo(x.tarea, LIM.previa)) { err.push("Cada tarea previa necesita de 10 a 200 caracteres."); break; }
@@ -389,7 +390,9 @@ export function validarPuente(pu: Puente, c: Constancia | null, p: Participante,
     if (d < 0) err.push("La fecha límite no puede estar en el pasado.");
     if (d > LIM.plazoMaxDias) err.push("La fecha límite no puede pasar de 90 días: un plazo sin fin no es un plazo.");
   }
-  if (!largo(pu.escalamiento, LIM.escalamiento)) err.push("Escribe qué pasa si nadie responde: a quién se escala y cuándo.");
+  if (!largo(pu.escalamiento, LIM.escalamiento)) err.push("Escribe qué pasa si nadie responde y cuándo se escala.");
+  if (!nombreCompleto(pu.escalaA ?? "")) err.push("El escalamiento necesita una persona con nombre y apellido.");
+  else if (normal(pu.escalaA) === normal(pu.coordinador)) err.push("Se escala a alguien distinto de quien lleva el caso.");
   for (const t of [pu.coordinador, pu.puesto, pu.fuenteDemanda, pu.falta, pu.accion, pu.escalamiento]) {
     const m = revisarTexto(t);
     if (m) { err.push(EXPLICACION_RECHAZO[m]); break; }
@@ -412,12 +415,31 @@ export function validarResultado(r: Omit<Resultado, "id" | "registrado">, pu: Pu
   }
   if (!largo(r.evidencia, LIM.evidenciaResultado)) err.push("Describe la evidencia: qué la confirma (correo, mensaje, recibo) sin pegar datos personales.");
   if (!nombreCompleto(r.confirmadoPor)) err.push("¿Quién lo confirmó? Nombre y apellido.");
+  /* Persona test, ronda 2: la coordinadora no puede confirmar su propio resultado. */
+  else if (r.tipo !== "sin-respuesta" && normal(r.confirmadoPor) === normal(pu.coordinador))
+    err.push("Un resultado lo confirma alguien distinto de quien lleva el caso (el empleador, el tutor u otra coordinadora).");
   const m = revisarTexto(r.evidencia) ?? revisarTexto(r.confirmadoPor);
   if (m) err.push(EXPLICACION_RECHAZO[m]);
   return err;
 }
 
 /** Cambios de estado permitidos. Ninguno depende de que exista la constancia. */
+export const MOTIVOS_CIERRE: Record<MotivoCierre, string> = {
+  transicion: "Consiguió prueba pagada o empleo (confirmado)",
+  "sin-respuesta": "Nadie respondió",
+  "ya-no-quiere": "La persona ya no quiere continuar",
+  otro: "Otro motivo",
+};
+
+/** Cerrar exige motivo; "transición" solo si está confirmada. Los cerrados siguen en la cuenta. */
+export function puedeCerrar(pu: Puente, motivo: MotivoCierre | "", ahora: Date): string | null {
+  const m = puedeCambiarEstado(pu, "cerrado", ahora);
+  if (m) return m;
+  if (!motivo || !(motivo in MOTIVOS_CIERRE)) return "Para cerrar, elige el motivo.";
+  if (motivo === "transicion" && !transicionConfirmada(pu)) return "No se cierra como transición sin una prueba pagada o contratación confirmada por otra persona.";
+  return null;
+}
+
 export function puedeCambiarEstado(pu: Puente, a: EstadoCaso, ahora: Date): string | null {
   if (!pu.guardado) return "Primero guarda el caso.";
   if (a === "accion-hecha" && pu.estado !== "abierto") return "Solo un caso abierto puede marcar su acción como completada.";
@@ -439,11 +461,12 @@ export function cuentaHonesta(c: Constancia | null, pu: Puente | null): { etique
   const n = (b: boolean) => (b ? "1" : "0");
   const r = (t: TipoResultado) => n(Boolean(pu?.resultados.some((x) => x.tipo === t)));
   return [
-    { etiqueta: "Casos en este navegador", valor: "1" },
-    { etiqueta: "Constancias emitidas", valor: `${n(Boolean(c))} de 1` },
-    { etiqueta: "Casos con demanda verificada", valor: `${n(Boolean(pu?.guardado && pu.demanda === "verificada"))} de 1` },
-    { etiqueta: "Entrevistas confirmadas", valor: `${r("entrevista")} de 1` },
-    { etiqueta: "Pruebas pagadas o contrataciones", valor: `${n(transicionConfirmada(pu))} de 1` },
+    { etiqueta: "Casos en este dispositivo", valor: "1" },
+    { etiqueta: "Con constancia emitida", valor: `${n(Boolean(c))} de 1 caso` },
+    { etiqueta: "Con demanda verificada", valor: `${n(Boolean(pu?.guardado && pu.demanda === "verificada"))} de 1 caso` },
+    { etiqueta: "Con entrevista confirmada por un tercero", valor: `${r("entrevista")} de 1 caso` },
+    { etiqueta: "Con prueba pagada o contratación confirmada", valor: `${n(transicionConfirmada(pu))} de 1 caso` },
+    { etiqueta: "Cerrados sin transición", valor: `${n(Boolean(pu?.estado === "cerrado" && !transicionConfirmada(pu)))} de 1 caso` },
   ];
 }
 

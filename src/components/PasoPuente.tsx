@@ -9,14 +9,14 @@ import { useState } from "react";
 import { Campo, Errores } from "./campos";
 import type { Estado } from "./PruebaViva";
 import {
-  cuentaHonesta, DEMANDA, ESTADOS, evidenciasDisponibles, fmtFecha, LIM, PUESTOS_VECINOS, puedeCambiarEstado,
+  cuentaHonesta, DEMANDA, ESTADOS, evidenciasDisponibles, fmtFecha, LIM, MOTIVOS_CIERRE, PUESTOS_VECINOS, puedeCambiarEstado, puedeCerrar,
   RESULTADOS, transicionConfirmada, validarPuente, validarResultado,
 } from "@/lib/motor";
-import type { EstadoCaso, Puente, TipoResultado } from "@/lib/types";
+import type { EstadoCaso, MotivoCierre, Puente, TipoResultado } from "@/lib/types";
 
 const VACIO: Puente = {
   coordinador: "", puesto: "", evidencias: [], demanda: "ilustrativa", fuenteDemanda: "", verificadaEl: "",
-  falta: "", accion: "", fechaLimite: "", escalamiento: "", estado: "abierto", resultados: [], guardado: false,
+  falta: "", accion: "", fechaLimite: "", escalamiento: "", escalaA: "", motivoCierre: "", estado: "abierto", resultados: [], guardado: false,
 };
 
 function hoy(): string {
@@ -113,7 +113,9 @@ export default function PasoPuente({ s, setS, demoPuente }: {
             <input id="flim" type="date" min={hoy()} value={pu.fechaLimite} onChange={(e) => setPu({ fechaLimite: e.target.value })} />
             <p className="ayuda">Máximo 90 días.</p>
           </div>
-          <Campo id="esc" label="Si nadie responde, ¿a quién se escala y cuándo?" lim={LIM.escalamiento} valor={pu.escalamiento} onChange={(v) => setPu({ escalamiento: v })} />
+          <Campo id="esc" label="Si nadie responde, ¿qué pasa y cuándo?" area ancho lim={LIM.escalamiento} valor={pu.escalamiento} onChange={(v) => setPu({ escalamiento: v })} />
+          <Campo id="escA" label="¿A quién se escala?" lim={[3, 80]} valor={pu.escalaA} onChange={(v) => setPu({ escalaA: v })}
+            ayuda="Nombre y apellido de alguien distinto de quien lleva el caso." />
         </div>
       </fieldset>
 
@@ -137,7 +139,8 @@ function Caso({ s, setS }: { s: Estado; setS: React.Dispatch<React.SetStateActio
   const [tipo, setTipo] = useState<TipoResultado>("sin-respuesta");
   const [fecha, setFecha] = useState(hoy());
   const [evidencia, setEvidencia] = useState("");
-  const [quien, setQuien] = useState(pu.coordinador);
+  const [quien, setQuien] = useState("");
+  const [motivo, setMotivo] = useState<MotivoCierre | "">("");
   const [errores, setErrores] = useState<string[]>([]);
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -148,6 +151,20 @@ function Caso({ s, setS }: { s: Estado; setS: React.Dispatch<React.SetStateActio
     if (err.length) return;
     setS((x) => ({ ...x, puente: { ...x.puente!, resultados: [...x.puente!.resultados, { ...r, id: `r${Date.now()}`, registrado: new Date().toISOString() }] } }));
     setEvidencia("");
+  };
+
+  const cerrar = () => {
+    const m = puedeCerrar(pu, motivo, new Date());
+    setAviso(m);
+    if (!m) setS((x) => ({ ...x, puente: { ...x.puente!, estado: "cerrado", motivoCierre: motivo } }));
+  };
+
+  const exportar = () => {
+    const datos = { exportado: new Date().toISOString(), encargo: s.encargo.titulo, alias: s.encargo.alias, constancia: s.emitida?.constancia.codigo, caso: pu };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `caso-${s.emitida?.constancia.codigo ?? "sin-folio"}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const cambiar = (a: EstadoCaso) => {
@@ -166,15 +183,27 @@ function Caso({ s, setS }: { s: Estado; setS: React.Dispatch<React.SetStateActio
       <p><b>Le falta:</b> {pu.falta}</p>
       <p><b>Siguiente acción:</b> {pu.accion}</p>
       <p><b>Responde:</b> {pu.coordinador} · <b>Fecha límite:</b> {fmtFecha(`${pu.fechaLimite}T12:00:00`)}</p>
-      <p><b>Si nadie responde:</b> {pu.escalamiento}</p>
+      <p><b>Si nadie responde:</b> {pu.escalamiento} Se escala a {pu.escalaA}.</p>
+      {pu.estado === "cerrado" && pu.motivoCierre && <p><b>Motivo de cierre:</b> {MOTIVOS_CIERRE[pu.motivoCierre]}</p>}
       {pu.demanda === "verificada" && <p><b>Demanda:</b> {pu.fuenteDemanda} (verificada el {fmtFecha(`${pu.verificadaEl}T12:00:00`)})</p>}
 
       <div className="botones">
         <button className="btn claro" onClick={() => cambiar("accion-hecha")}>Marcar acción completada</button>
         <button className="btn claro" onClick={() => cambiar("sin-respuesta-escalado")}>Escalar por falta de respuesta</button>
-        <button className="btn claro" onClick={() => cambiar("cerrado")}>Cerrar caso</button>
       </div>
+      {pu.estado !== "cerrado" && (
+        <div className="botones" style={{ marginTop: 10 }}>
+          <select aria-label="Motivo de cierre" value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoCierre | "")} style={{ width: "auto", maxWidth: "100%" }}>
+            <option value="">Motivo para cerrar…</option>
+            {(Object.keys(MOTIVOS_CIERRE) as MotivoCierre[]).map((k) => <option key={k} value={k}>{MOTIVOS_CIERRE[k]}</option>)}
+          </select>
+          <button className="btn claro" onClick={cerrar}>Cerrar caso</button>
+        </div>
+      )}
       {aviso && <p className="errores">{aviso}</p>}
+
+      <p className="aviso-local">Este caso solo existe en este dispositivo. Descárgalo antes de borrar el navegador o para que otra persona lo audite.
+        {" "}<button className="btn-texto" onClick={exportar}>Descargar el caso</button></p>
 
       <h3 style={{ marginTop: 22 }}>Seguimiento</h3>
       {pu.resultados.length === 0 && <p className="ayuda">Todavía no hay resultados. Una constancia emitida no cuenta como resultado.</p>}
@@ -198,7 +227,8 @@ function Caso({ s, setS }: { s: Estado; setS: React.Dispatch<React.SetStateActio
           </div>
           <Campo id="rev" label="¿Qué lo confirma?" area ancho lim={LIM.evidenciaResultado} valor={evidencia} onChange={setEvidencia}
             ayuda="Ej. correo del empleador con fecha de entrevista, recibo del pago. Sin pegar datos personales." />
-          <Campo id="rquien" label="¿Quién lo confirmó?" lim={[3, 80]} valor={quien} onChange={setQuien} />
+          <Campo id="rquien" label="¿Quién lo confirmó?" lim={[3, 80]} valor={quien} onChange={setQuien}
+            ayuda="Alguien distinto de quien lleva el caso: el empleador, el tutor u otra coordinadora. Solo 'sin respuesta' lo puede registrar la coordinadora." />
         </div>
         <Errores lista={errores} />
         <div className="botones"><button className="btn" onClick={registrar}>Registrar</button></div>

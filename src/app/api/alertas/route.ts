@@ -25,7 +25,9 @@ export async function POST(req: Request) {
   }
   const datos: EntradaAlertas = { ...v.datos, preguntas, notas };
 
-  const raw = await gemini(SISTEMA_ALERTAS, promptAlertas(datos));
+  // Si el participante no autorizó la IA, su bitácora no sale al modelo.
+  const sinIA = Boolean((body as { sinIA?: unknown })?.sinIA);
+  const raw = sinIA ? null : await gemini(SISTEMA_ALERTAS, promptAlertas(datos));
   const alertas = raw ? validarAlertas(raw) : null;
   if (alertas) return NextResponse.json({ alertas, fuente: "gemini" });
   return NextResponse.json({ alertas: alertasSimuladas(datos), fuente: "simulado" });

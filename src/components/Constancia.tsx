@@ -41,14 +41,14 @@ export default function Constancia({ c, autentica }: { c: C; autentica: boolean 
         <p className="cita">“{c.nota}”</p>
       </div>
 
-      <h3>Lo que el tutor vio · criterios oficiales {c.estandar.codigo}</h3>
+      <h3>Lo que el tutor vio · criterios tomados de CONOCER {c.estandar.codigo}</h3>
       <ul>
         {c.vistos.map((v) => <li key={v.id}>{v.texto} <span className="cod">{v.id}</span></li>)}
       </ul>
 
       {c.noVistos.length > 0 && (
         <>
-          <h3>No se observó en este encargo</h3>
+          <h3>Aún no se observó en este encargo</h3>
           <ul>
             {c.noVistos.map((v) => <li key={v.id}>{v.texto} <span className="cod">{v.id}</span></li>)}
           </ul>

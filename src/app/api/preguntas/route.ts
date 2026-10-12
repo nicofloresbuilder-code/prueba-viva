@@ -10,7 +10,9 @@ export async function POST(req: Request) {
   const v = validarEntradaIA(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
-  const raw = await gemini(SISTEMA_PREGUNTAS, promptPreguntas(v.datos));
+  // Si el participante no autorizó la IA, su bitácora no sale al modelo.
+  const sinIA = Boolean((body as { sinIA?: unknown })?.sinIA);
+  const raw = sinIA ? null : await gemini(SISTEMA_PREGUNTAS, promptPreguntas(v.datos));
   const preguntas = raw ? validarPreguntas(raw, v.datos.criterios) : null;
   if (preguntas) return NextResponse.json({ preguntas, fuente: "gemini" });
 

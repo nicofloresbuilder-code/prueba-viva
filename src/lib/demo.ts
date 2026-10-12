@@ -69,6 +69,8 @@ export const NOTAS_DEMO = [
 /** Participante de ejemplo: un primer empleo administrativo, sin historial formal. */
 export const PARTICIPANTE_DEMO: Participante = {
   consiente: true,
+  iaPermitida: true,
+  vioCondiciones: true,
   consentidoEn: hace(6, 9, 5),
   previas: [
     { id: "x1", tarea: "Llevé la lista de pedidos y cobros del puesto de comida de mi tía los fines de semana durante un año.", fuente: "testigo", informal: true },
@@ -89,9 +91,11 @@ export function puenteDemo(): Puente {
     fuenteDemanda: "",
     verificadaEl: "",
     falta: "Usar fórmulas básicas de hoja de cálculo para conciliar (BUSCARV o equivalente).",
-    accion: "Hacer frente a la coordinadora una conciliación de 50 pedidos contra un corte de caja, con defensa en vivo de 10 minutos.",
+    accion: "Hacer, con la coordinadora presente, una conciliación de 50 pedidos contra un corte de caja y explicarla en 10 minutos.",
     fechaLimite: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`,
-    escalamiento: "Si en la fecha límite no hay avance, la coordinadora lo revisa con el responsable de PUENTE MX esa misma semana.",
+    escalamiento: "Si en la fecha límite no hay avance, se escala esa misma semana para revisar la acción o cambiar de puesto vecino.",
+    escalaA: "Jorge Salinas",
+    motivoCierre: "",
     estado: "abierto",
     resultados: [],
     guardado: false,
